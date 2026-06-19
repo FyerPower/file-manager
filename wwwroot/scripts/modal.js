@@ -1,4 +1,4 @@
-(function(){
+(function () {
     // Modal Control
     const $modalOverlay = document.getElementById('modalOverlay');
     const $modal = document.getElementById('modal');

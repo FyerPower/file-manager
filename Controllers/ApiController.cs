@@ -350,17 +350,17 @@ namespace FileManager.Controllers
         [HttpPut]
         public IActionResult MoveFile(string sourcePath, string destinationPath)
         {
-            // If either the sourcePath or destinationPath is null, empty, or whitespace, return a 400 Bad Request response with an error message indicating that both paths are required
-            if (string.IsNullOrWhiteSpace(sourcePath) || string.IsNullOrWhiteSpace(destinationPath))
+            // If the sourcePath is null, empty, or whitespace, return a 400 Bad Request response with an error message indicating that both paths are required
+            if (string.IsNullOrWhiteSpace(sourcePath))
             {
-                return BadRequest(new { error = "Both sourcePath and destinationPath are required" });
+                return BadRequest(new { error = "sourcePath is required" });
             }
 
             try
             {
                 string sourceFullPath = Path.Combine(_rootDirectory, sourcePath);
                 sourceFullPath = Normalize(sourceFullPath);
-                string destinationFullPath = Path.Combine(_rootDirectory, destinationPath);
+                string destinationFullPath = Path.Combine(_rootDirectory, destinationPath ?? "");
                 destinationFullPath = Normalize(destinationFullPath);
 
                 // Validate both source and destination paths are within the root directory ( prevents ../ attacks )
@@ -584,6 +584,7 @@ namespace FileManager.Controllers
                 return string.Empty;
 
             return path
+                .Trim()
                 .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                 .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
         }

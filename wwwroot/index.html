@@ -1,7 +1,8 @@
 ﻿<!-- Webpage: https://localhost:7146/index.html -->
 <!-- API: https://localhost:7146/api/ -->
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -11,7 +12,7 @@
         body {
             background: linear-gradient(to bottom right, #29EAC4, #4284DB);
         }
-        
+
         #modalOverlay {
             display: none;
             position: fixed;
@@ -22,13 +23,13 @@
             background-color: rgba(0, 0, 0, 0.5);
             z-index: 999;
         }
-        
+
         #modalOverlay.active {
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        
+
         #modal {
             background-color: white;
             border-radius: 0.5rem;
@@ -42,6 +43,7 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Page Content (Open File Manager Button)-->
     <div class="flex items-center justify-center min-h-screen">
@@ -56,7 +58,8 @@
             <!-- Modal Header with Close Button -->
             <div class="flex items-center justify-between p-4 border-b bg-gray-50">
                 <h2 class="text-xl font-semibold">File Manager</h2>
-                <button id="btnCloseModal" class="text-gray-600 hover:text-gray-900 text-2xl leading-none">&times;</button>
+                <button id="btnCloseModal"
+                    class="text-gray-600 hover:text-gray-900 text-2xl leading-none">&times;</button>
             </div>
 
             <!-- Modal Content -->
@@ -65,13 +68,19 @@
                 <div class="bg-white">
                     <!-- Controls -->
                     <div class="p-3 border-b flex gap-2 items-center">
-                        <input id="search" type="text" placeholder="Search directory..." class="flex-1 border rounded px-3 py-2" />
+                        <input id="search" type="text" placeholder="Search directory..."
+                            class="flex-1 border rounded px-3 py-2" />
                         <button id="btnSearch" class="bg-blue-600 text-white px-3 py-2 rounded">🔎 Search</button>
-                        <button id="btnNewFolder" class="bg-green-500 text-white px-3 py-2 rounded">📁 Create Folder</button>
-                        <button id="btnUploadFile" class="bg-indigo-500 text-white px-3 py-2 rounded">📄 Upload File</button>
-                        <button id="btnDuplicate" class="bg-purple-500 text-white px-3 py-2 rounded opacity-30" disabled>📋 Duplicate</button>
-                        <button id="btnMove" class="bg-yellow-500 text-white px-3 py-2 rounded opacity-30" disabled>➥ Move</button>
-                        <button id="btnDelete" class="bg-red-600 text-white px-3 py-2 rounded opacity-30" disabled>🗑 Delete</button>
+                        <button id="btnNewFolder" class="bg-green-500 text-white px-3 py-2 rounded">📁 Create
+                            Folder</button>
+                        <button id="btnUploadFile" class="bg-indigo-500 text-white px-3 py-2 rounded">📄 Upload
+                            File</button>
+                        <button id="btnDuplicate" class="bg-purple-500 text-white px-3 py-2 rounded opacity-30"
+                            disabled>📋 Duplicate</button>
+                        <button id="btnMove" class="bg-yellow-500 text-white px-3 py-2 rounded opacity-30" disabled>➥
+                            Move</button>
+                        <button id="btnDelete" class="bg-red-600 text-white px-3 py-2 rounded opacity-30" disabled>🗑
+                            Delete</button>
                         <input id="fileInput" type="file" class="hidden" />
                     </div>
 
@@ -80,9 +89,10 @@
                         <div class="mb-3 flex justify">
                             <!-- Navigation (back button / current path) -->
                             <div class="flex items-center gap-3">
-                                <button id="btnBack" class="px-2 py-1 border rounded text-sm text-gray-600 opacity-30" disabled>⮬ Parent</button>
+                                <button id="btnBack" class="px-2 py-1 border rounded text-sm text-gray-600 opacity-30"
+                                    disabled>⮬ Parent</button>
                                 <nav class="text-sm text-gray-600 flex items-center gap-2">
-                                    Path: 
+                                    Path:
                                     <span id="currentPath" class="flex items-center gap-1"></span>
                                 </nav>
                             </div>
@@ -101,13 +111,15 @@
                         </ul>
                     </div>
                 </div>
-                    <div id="queryTimeResults" class="py-2 text-sm text-gray-700 text-center"></div>
-                </div>
+                <div id="queryTimeResults" class="py-2 text-sm text-gray-700 text-center"></div>
             </div>
         </div>
     </div>
+    </div>
 
+    <script src="/scripts/api.js"></script>
     <script src="/scripts/modal.js"></script>
     <script src="/scripts/fileManager.js"></script>
 </body>
+
 </html>

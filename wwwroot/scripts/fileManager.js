@@ -1,4 +1,6 @@
-(function(){
+(function () {
+    const api = new API();
+
     // Default the currentPath to empty string (root)
     let currentPath = '';
     let currentSearch = '';
@@ -84,18 +86,12 @@
             search = search || '';
 
             // Load Directory Listing
-            const params = new URLSearchParams();
-            if (search) params.set('search', search);
-            if (path) params.set('path', path);
-            const start = performance.now();
-            const res = await fetch(`/api?${params.toString()}`);
-            const fetchTimeMs = (performance.now() - start).toFixed(1);
-            $queryTimeResults.innerHTML = `Latest Fetch Time: ${fetchTimeMs} ms`;
-
-            // If there was an issue loading the data, throw an error and do NOT continue.  This will ensure that we 
-            //   don't start updating state the new path if we had failed to fetch data.
-            if (!res.ok) throw res;
-            const items = await res.json();
+            // TODO: Add Loading Indicator
+            const items = await api.get('/api', {
+                params: { search, path },
+                beforeFetch: () => { console.log("Loading"); },
+                afterFetch: (ms) => { $queryTimeResults.innerHTML = `Latest Fetch Time: ${ms} ms`; }
+            });
 
             // Update the current path to the provided path
             currentPath = path || '';
@@ -139,7 +135,7 @@
         try {
             // Clear existing items
             $currentPathDiv.innerHTML = '';
-            
+
             const breadcrumbLink = document.createElement('a');
             breadcrumbLink.className = 'text-sm cursor-pointer';
             breadcrumbLink.textContent = '🏠';
@@ -149,14 +145,14 @@
             };
             $currentPathDiv.appendChild(breadcrumbLink);
 
-            if(currentPath){
+            if (currentPath) {
                 const breadcrumbs = currentPath.split("/");
-                for( let i = 0 ; i < breadcrumbs.length ; i++ ) {
+                for (let i = 0; i < breadcrumbs.length; i++) {
                     // Add the list item to the list
                     const folderDelimiter = document.createElement('span');
                     folderDelimiter.textContent = '/';
                     $currentPathDiv.appendChild(folderDelimiter);
-    
+
                     // Add Breadcrumb
                     const breadcrumbLink = document.createElement('a');
                     breadcrumbLink.className = 'text-sm text-blue-600 underline cursor-pointer';
@@ -199,7 +195,7 @@
         $fileListDiv.innerHTML = '';
 
         let fileCount = 0, folderCount = 0, totalSize = 0, totalFileCount = 0;
-        
+
         // Display new Items
         items.forEach(it => {
             // Create List Item
@@ -233,7 +229,7 @@
                 nameDiv.textContent = it.name;
             }
             leftContent.appendChild(nameDiv);
-            
+
             // Add left side
             li.appendChild(leftContent);
 
@@ -241,7 +237,7 @@
             const rightContent = document.createElement('div');
             rightContent.className = 'flex items-center text-right';
             // File Count
-            if(it.type === 'folder'){
+            if (it.type === 'folder') {
                 const subFileCount = document.createElement('div');
                 subFileCount.textContent = `${it.fileCount.toLocaleString()} Files`;
                 subFileCount.className = 'text-sm text-gray-400';
@@ -281,8 +277,8 @@
             $fileListDiv.appendChild(li);
 
             // Incremenet File Statistics
-            if(it.type === 'file') fileCount++;
-            if(it.type === 'folder') folderCount++;
+            if (it.type === 'file') fileCount++;
+            if (it.type === 'folder') folderCount++;
             totalFileCount += it.fileCount;
             totalSize += it.size;
         });
@@ -294,20 +290,12 @@
 
     async function downloadFile(filePath, fileName) {
         try {
-            const response = await fetch('/api/download', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ path: filePath })
+            const blob = await api.post('/api/download', {
+                body: JSON.stringify({ path: filePath }),
+                headers: { 'Content-Type': 'application/json' },
+                responseType: 'blob'
             });
 
-            if (!response.ok) {
-                const message = await response.text();
-                throw new Error(message || 'Download failed');
-            }
-
-            const blob = await response.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -327,12 +315,12 @@
     function updateActionButtons() {
         // Check selection status
         const hasFilesSelected = selectedItems.size > 0;
-        
+
         // Update State
         $moveButton.disabled = !hasFilesSelected;
         $deleteButton.disabled = !hasFilesSelected;
         $duplicateButton.disabled = !hasFilesSelected;
-        
+
         // Update Style
         $moveButton.classList.toggle('opacity-30', !hasFilesSelected);
         $deleteButton.classList.toggle('opacity-30', !hasFilesSelected);
@@ -367,22 +355,23 @@
         // Keeping it simple.  Standard browser prompt for folder name input.  In a production app, you'd 
         //   likely want a custom modal with better validation and UX.
         const folderName = prompt('Folder name:');
-        
+
         // If user cancels or enters an empty name, we simply return early and do nothing.
         if (!folderName) return;
-        
+
         // Construct the path for the new folder. If we're currently in a subdirectory, we need to append 
         //   the new folder name to the current path.
         const folderPath = (currentPath ? currentPath + '/' : '') + folderName + '/';
         try {
             // Send POST request to the server to create the new folder
-            const url = '/api?path=' + encodeURIComponent(folderPath);
-            const response = await fetch(url, { method: 'POST' });
-            if (!response.ok) throw response;
-        
+            await api.post('/api', {
+                params: { path: encodeURIComponent(folderPath) },
+                beforeFetch: () => { console.log("Duplicating"); },
+                afterFetch: (ms) => { console.log("Duplicating", ms); }
+            });
             // After successfully creating the folder.. refresh the view.
             refreshFileList();
-        } catch (e) { 
+        } catch (e) {
             const errorMessage = e.body ? await e.text() : e;
             alert(`Failed to create folder.  ${errorMessage}`);
         }
@@ -404,13 +393,13 @@
         // Build form data with the file contents
         const formData = new FormData();
         formData.append('file', file);
-        
+
         try {
             // Build the full path the file for use on upload
             const path = (currentPath ? currentPath + '/' : '') + file.name;
             // Upload to backend api
-            const res = await fetch(`/api?path=${encodeURIComponent(path)}`, { method: 'POST', body: formData });
-            if (!res.ok) throw res;
+            // TODO: Add Loading Indicator
+            await api.post('/api', { params: { path }, body: formData });
             // On success, clear the file input and refresh the file list.
             input.value = '';
             refreshFileList();
@@ -419,21 +408,24 @@
             alert(`Failed to upload file.  ${errorMessage}`);
         }
     }
-    
+
     /**
      * Handle the move button
      */
     async function handleMoveButton() {
         if (selectedItems.size === 0) return alert('Select items to move');
         const dst = prompt('Destination folder (relative to root):');
-        if (!dst) return;
+        if (dst === "/") dst = "";
         try {
             for (const src of Array.from(selectedItems)) {
                 const name = src.split('/').pop();
                 const destination = dst.endsWith('/') || dst === '' ? dst + name : (dst + '/' + name);
-                const url = '/api?sourcePath=' + encodeURIComponent(src) + '&destinationPath=' + encodeURIComponent(destination);
-                const res = await fetch(url, { method: 'PUT' });
-                if (!res.ok) throw res;
+                // TODO: Add Loading Indicator
+                await api.put('/api', {
+                    params: { sourcePath: src, destinationPath: destination },
+                    beforeFetch: () => { console.log("Moving File"); },
+                    afterFetch: (ms) => { console.log("Successfully Moved File", ms); }
+                });
             }
             selectedItems.clear();
             updateActionButtons();
@@ -449,9 +441,12 @@
         if (!confirm('Delete selected items?')) return;
         try {
             for (const path of Array.from(selectedItems)) {
-                const url = '/api?path=' + encodeURIComponent(path);
-                const res = await fetch(url, { method: 'DELETE' });
-                if (!res.ok) throw res;
+                // TODO: Add loading indicator
+                await api.delete('/api', {
+                    params: { path: encodeURIComponent(path) },
+                    beforeFetch: () => { console.log("Deleting Object"); },
+                    afterFetch: (ms) => { console.log("Successfully Deleted Object", ms); }
+                });
                 selectedItems.delete(path);
             }
             updateActionButtons();
@@ -465,9 +460,13 @@
     async function handleDuplicateButton() {
         if (selectedItems.size === 0) return alert('Select items to duplicate');
         try {
-            for (const p of Array.from(selectedItems)) {
-                const res = await fetch('/api/duplicate?path=' + encodeURIComponent(p), { method: 'POST' });
-                if (!res.ok) throw res;
+            for (const path of Array.from(selectedItems)) {
+                // TODO: Add Loading Indicator Per Item
+                await api.post('/api/duplicate', {
+                    params: { path: encodeURIComponent(path) },
+                    beforeFetch: () => { console.log("Duplicating"); },
+                    afterFetch: (ms) => { console.log("Duplicating", ms); }
+                });
                 selectedItems.delete(p);
             }
             updateActionButtons();
