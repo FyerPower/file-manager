@@ -49,13 +49,13 @@ namespace FileManager.Controllers
                 // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
                 if (!IsWithinRootDirectory(fullPath, true))
                 {
-                    return BadRequest("Invalid path - access denied");
+                    return BadRequest(new { error = "Invalid path - access denied" });
                 }
 
                 // Check if directory exists
                 if (!Directory.Exists(fullPath))
                 {
-                    return NotFound("Directory not found");
+                    return NotFound(new { error = "Directory not found" });
                 }
 
                 // Create a list to hold the folder items (both files and directories)
@@ -86,7 +86,7 @@ namespace FileManager.Controllers
             {
                 // If we caught an exception during the directory reading process, log the error and return a 500 Internal Server Error
                 _logger.LogError(ex, "Error reading directory");
-                return StatusCode(500, "Error reading directory");
+                return StatusCode(500, new { error = "Error reading directory" });
             }
         }
 
@@ -112,7 +112,7 @@ namespace FileManager.Controllers
         {
             if (request == null || string.IsNullOrWhiteSpace(request.Path))
             {
-                return BadRequest("Path is required");
+                return BadRequest(new { error = "Path is required" });
             }
 
             try
@@ -124,13 +124,13 @@ namespace FileManager.Controllers
                 // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
                 if (!IsWithinRootDirectory(fullPath))
                 {
-                    return BadRequest("Invalid path - access denied");
+                    return BadRequest(new { error = "Invalid path - access denied" });
                 }
 
                 // Check if the path points to a file
                 if (!System.IO.File.Exists(fullPath))
                 {
-                    return NotFound("File not found");
+                    return NotFound(new { error = "File not found" });
                 }
 
                 // Get file information for the response headers
@@ -143,7 +143,7 @@ namespace FileManager.Controllers
             {
                 // If we caught an exception during the file download process, log the error and return a 500 Internal Server Error
                 _logger.LogError(ex, "Error downloading file");
-                return StatusCode(500, "Error downloading file");
+                return StatusCode(500, new { error = "Error downloading file" });
             }
         }
 
@@ -170,7 +170,7 @@ namespace FileManager.Controllers
             {
                 return await CreateFolder(path);
             }
-            return BadRequest("File or Path are required");
+            return BadRequest(new { error = "File or Path are required" });
         }
 
         /**
@@ -198,7 +198,7 @@ namespace FileManager.Controllers
             // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
             if (!IsWithinRootDirectory(fullPath))
             {
-                return BadRequest("Invalid path - access denied");
+                return BadRequest(new { error = "Invalid path - access denied" });
             }
 
             try
@@ -215,12 +215,12 @@ namespace FileManager.Controllers
                 // Update cache for newly created file
                 try { DirectoryStatisticsCache.HandleFileCreated(fullPath, file.Length); } catch { }
 
-                return Ok("File created successfully");
+                return Ok(new { message = "File created successfully" });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating file");
-                return StatusCode(500, "Error creating file");
+                return StatusCode(500, new { error = "Error creating file" });
             }
         }
 
@@ -246,7 +246,7 @@ namespace FileManager.Controllers
             // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
             if (!IsWithinRootDirectory(fullPath))
             {
-                return BadRequest("Invalid path - access denied");
+                return BadRequest(new { error = "Invalid path - access denied" });
             }
 
             // If the folder does not already exist, lets create it.
@@ -255,12 +255,12 @@ namespace FileManager.Controllers
                 Directory.CreateDirectory(fullPath);
                 // Ensure cache updated for new (empty) directory
                 try { DirectoryStatisticsCache.HandleFolderCreate(fullPath); } catch { }
-                return Ok("Folder created successfully");
+                return Ok(new { message = "Folder created successfully" });
             }
 
             // If we got here, that means the folder already exists, lets return a fail response indicating that.
             _logger.LogError("Folder at path already exists: {Path}", fullPath);
-            return StatusCode(500, $"Folder at path already exists: {path}");
+            return StatusCode(500, new { error = $"Folder at path already exists: {path}" });
         }
 
         /**
@@ -284,7 +284,7 @@ namespace FileManager.Controllers
             // If the path provided is null, empty, or whitespace, return a 400 Bad Request response with an error message indicating that the path is required
             if (string.IsNullOrWhiteSpace(path))
             {
-                return BadRequest("Path is required");
+                return BadRequest(new { error = "Path is required" });
             }
 
             try
@@ -296,7 +296,7 @@ namespace FileManager.Controllers
                 // Validate the file or directory is within the root directory ( prevents ../ attacks )
                 if (!IsWithinRootDirectory(fullPath))
                 {
-                    return BadRequest("Invalid path - access denied");
+                    return BadRequest(new { error = "Invalid path - access denied" });
                 }
 
                 // Delete if its a file
@@ -306,7 +306,7 @@ namespace FileManager.Controllers
                     try { var fi = new FileInfo(fullPath); size = fi.Length; } catch { }
                     System.IO.File.Delete(fullPath);
                     try { DirectoryStatisticsCache.HandleFileDeleted(fullPath, size); } catch { }
-                    return Ok("Deleted successfully");
+                    return Ok(new { message = "Deleted successfully" });
                 }
 
                 // Delete if its a directory (recursively)
@@ -314,17 +314,17 @@ namespace FileManager.Controllers
                 {
                     Directory.Delete(fullPath, true);
                     try { DirectoryStatisticsCache.HandleDirectoryDeleted(fullPath); } catch { }
-                    return Ok("Deleted successfully");
+                    return Ok(new { message = "Deleted successfully" });
                 }
 
                 // If the file or directory does not exist, return a 404 Not Found
-                return NotFound("File or directory not found");
+                return NotFound(new { error = "File or directory not found" });
             }
             catch (Exception ex)
             {
                 // If we caught an exception during the deletion process, log the error and return a 500 Internal Server Error
                 _logger.LogError(ex, "Error deleting path");
-                return StatusCode(500, "Error deleting path");
+                return StatusCode(500, new { error = "Error deleting path" });
             }
         }
 
@@ -353,7 +353,7 @@ namespace FileManager.Controllers
             // If either the sourcePath or destinationPath is null, empty, or whitespace, return a 400 Bad Request response with an error message indicating that both paths are required
             if (string.IsNullOrWhiteSpace(sourcePath) || string.IsNullOrWhiteSpace(destinationPath))
             {
-                return BadRequest("Both sourcePath and destinationPath are required");
+                return BadRequest(new { error = "Both sourcePath and destinationPath are required" });
             }
 
             try
@@ -366,13 +366,13 @@ namespace FileManager.Controllers
                 // Validate both source and destination paths are within the root directory ( prevents ../ attacks )
                 if (!IsWithinRootDirectory(sourceFullPath) || !IsWithinRootDirectory(destinationFullPath))
                 {
-                    return BadRequest("Source and destination must be within the root directory");
+                    return BadRequest(new { error = "Source and destination must be within the root directory" });
                 }
 
                 // Validate both the source and destination paths are different
                 if (string.Equals(sourceFullPath, destinationFullPath, StringComparison.OrdinalIgnoreCase))
                 {
-                    return BadRequest("Source and destination cannot be the same");
+                    return BadRequest(new { error = "Source and destination cannot be the same" });
                 }
 
                 // If we're moving a file and it exists, move it to the destination accordingly.
@@ -398,7 +398,7 @@ namespace FileManager.Controllers
                     try { DirectoryStatisticsCache.HandleFileMoved(sourceFullPath, destinationFullPath, size); } catch { }
 
                     // Return a 200 OK response with a success message indicating that the file was moved successfully
-                    return Ok("Moved successfully");
+                    return Ok(new { message = "Moved successfully" });
                 }
 
                 // If we're moving a directory..
@@ -408,7 +408,7 @@ namespace FileManager.Controllers
                     //   Force append a DirectorySeparatorChar to the sourceFullPath to ensure we are comparing directories correctly (e.g., C:/TestFiles/Source vs C:/TestFiles/SourceSubfolder)
                     if (destinationFullPath.StartsWith(sourceFullPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                     {
-                        return BadRequest("Destination cannot be inside the source directory");
+                        return BadRequest(new { error = "Destination cannot be inside the source directory" });
                     }
 
                     // If the destination folder does not exist yet, lets create it
@@ -423,17 +423,17 @@ namespace FileManager.Controllers
                     try { DirectoryStatisticsCache.HandleDirectoryMoved(sourceFullPath, destinationFullPath); } catch { }
 
                     // Return a 200 OK response with a success message indicating that the directory was moved successfully
-                    return Ok("Moved successfully");
+                    return Ok(new { message = "Moved successfully" });
                 }
 
                 // If the source file or directory does not exist, return a 404 Not Found
-                return NotFound("Source file or directory not found");
+                return NotFound(new { error = "Source file or directory not found" });
             }
             catch (Exception ex)
             {
                 // If we caught an exception during the move operation, log the error and return a 500 Internal Server Error
                 _logger.LogError(ex, "Error moving path");
-                return StatusCode(500, "Error moving path");
+                return StatusCode(500, new { error = "Error moving path" });
             }
         }
 
@@ -458,7 +458,7 @@ namespace FileManager.Controllers
             // Validate a path was sent
             if (string.IsNullOrWhiteSpace(path))
             {
-                return BadRequest("Path is required");
+                return BadRequest(new { error = "Path is required" });
             }
 
             try
@@ -469,7 +469,7 @@ namespace FileManager.Controllers
                 // Security Guard: Validate the path is within the root directory
                 if (!IsWithinRootDirectory(sourceFullPath))
                 {
-                    return BadRequest("Invalid path - access denied");
+                    return BadRequest(new { error = "Invalid path - access denied" });
                 }
 
                 // Check if we're duplicating a file
@@ -495,7 +495,7 @@ namespace FileManager.Controllers
                     var fileInformation = new FileInfo(destinationPath);
                     DirectoryStatisticsCache.HandleFileCreated(destinationPath, fileInformation.Length);
 
-                    return Ok($"File duplicated successfully to {path}");
+                    return Ok(new { message = $"File duplicated successfully to {path}" });
                 }
 
                 // If we're duplicating a directory
@@ -519,16 +519,16 @@ namespace FileManager.Controllers
                     // Update cache for the duplicated directory tree
                     DirectoryStatisticsCache.GetStatistics(destinationPath);
 
-                    return Ok($"Directory duplicated successfully to {path}");
+                    return Ok(new { message = $"Directory duplicated successfully to {path}" });
                 }
 
                 // If the source file or directory does not exist
-                return NotFound("Source file or directory not found");
+                return NotFound(new { error = "Source file or directory not found" });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error duplicating path");
-                return StatusCode(500, "Error duplicating path");
+                return StatusCode(500, new { error = "Error duplicating path" });
             }
         }
 
