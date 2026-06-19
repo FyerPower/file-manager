@@ -25,10 +25,8 @@ services:
             - ASPNETCORE_ENVIRONMENT=Production
         
         # Mounted Volumes
-        # C:\Users\gameg\AppData\Roaming\PrismLauncher\instances\All the Mons - ATMons\minecraft → 
         volumes:
             - "//c/Users/gameg/AppData/Roaming/PrismLauncher/instances/All the Mons - ATMons/minecraft:/data/root"
-            # - "C:\\Users\\gameg\\AppData\\Roaming\\PrismLauncher\\instances\\All the Mons - ATMons\\minecraft:/app/root"
 
         # Restart Policy
         restart: unless-stopped
