@@ -9,7 +9,7 @@
     }
   },
   "profiles": {
-    "TestProject": {
+    "FileManager": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,

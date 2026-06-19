@@ -1,4 +1,4 @@
-namespace TestProject {
+namespace FileManager {
     public class Program {
         public static void Main(string[] args) {
             var builder = WebApplication.CreateBuilder(args);

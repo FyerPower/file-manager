@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace TestProject.Helpers {
+namespace FileManager.Helpers {
     // Thread-safe cache for directory statistics (size and file count).
     // Populates cache recursively and exposes methods to update cache on file create/delete/move.
     public static class DirectoryStatisticsCache{

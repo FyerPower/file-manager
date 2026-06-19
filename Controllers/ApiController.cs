@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using TestProject.Helpers;
+using FileManager.Helpers;
 
-namespace TestProject.Controllers {
+namespace FileManager.Controllers {
     [ApiController]
     [Route("[controller]")]
     public class ApiController : ControllerBase {
