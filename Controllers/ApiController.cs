@@ -187,6 +187,7 @@ namespace FileManager.Controllers
           * Responses:
           *   - 200 OK: If the file was uploaded successfully.
           *   - 400 Bad Request: If the validation fails (e.g., invalid path).
+          *   - 409 Conflict: If a file or folder already exists at the target path.
           *   - 500 Internal Server Error: If an error occurs during the file upload process.
           */
         private async Task<IActionResult> UploadFile(string? path, IFormFile file)
@@ -203,6 +204,12 @@ namespace FileManager.Controllers
 
             try
             {
+                // Fail fast if the target path already exists as a file or folder
+                if (System.IO.File.Exists(fullPath) || Directory.Exists(fullPath))
+                {
+                    return Conflict(new { error = "A file or folder already exists at the specified path" });
+                }
+
                 string directoryPath = Path.GetDirectoryName(fullPath) ?? _rootDirectory;
                 if (!Directory.Exists(directoryPath))
                 {
@@ -231,11 +238,12 @@ namespace FileManager.Controllers
          * Validations:
          *   - The path must be within the root directory (prevents ../ attacks).
          * Behavior:
-         *   - If the folder already exists, it will return a success response without creating a new one.
+         *   - If the folder already exists, it will return a conflict response.
          *   - If the folder does not exist, it will be created at the specified path.
          * Responses:
-         *   - 200 OK: If the folder was created successfully or already exists.
+         *   - 200 OK: If the folder was created successfully.
          *   - 400 Bad Request: If the validation fails (e.g., invalid path).
+         *   - 409 Conflict: If a file or folder already exists at the specified path.
          *   - 500 Internal Server Error: If an error occurs during the folder creation process.
          */
         private async Task<IActionResult> CreateFolder(string path)
@@ -249,18 +257,16 @@ namespace FileManager.Controllers
                 return BadRequest(new { error = "Invalid path - access denied" });
             }
 
-            // If the folder does not already exist, lets create it.
-            if (!Directory.Exists(fullPath))
+            // Fail if the same path already exists as a folder
+            if (Directory.Exists(fullPath))
             {
-                Directory.CreateDirectory(fullPath);
-                // Ensure cache updated for new (empty) directory
-                try { DirectoryStatisticsCache.HandleFolderCreate(fullPath); } catch { }
-                return Ok(new { message = "Folder created successfully" });
+                return Conflict(new { error = "A folder already exists at the specified path" });
             }
 
-            // If we got here, that means the folder already exists, lets return a fail response indicating that.
-            _logger.LogError("Folder at path already exists: {Path}", fullPath);
-            return StatusCode(500, new { error = $"Folder at path already exists: {path}" });
+            Directory.CreateDirectory(fullPath);
+            // Ensure cache updated for new (empty) directory
+            try { DirectoryStatisticsCache.HandleFolderCreate(fullPath); } catch { }
+            return Ok(new { message = "Folder created successfully" });
         }
 
         /**

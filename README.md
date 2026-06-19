@@ -76,8 +76,6 @@ The application is built and bundled into a docker image that can be deployed ne
 
 - **Solution B:** Limit the length of the cache by a time-constraint.   This will ensure that if files / folders are changed outside, metrics will quickly be updated based on the time expiration.   Consideration must then be determined how long that time limit it.  Longer times could result in more data being wrong, while Shorter times would result in more overhead / computing cost.
 
-**Problem:** If a file already exists, it allows reuploading a file.  This should return an error.
-
 ## Improvements
 
 - Add drag and drop functionality for uploading of files.
