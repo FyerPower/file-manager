@@ -2,6 +2,8 @@ namespace FileManager {
     public class Program {
         public static void Main(string[] args) {
             var builder = WebApplication.CreateBuilder(args);
+            
+            builder.Configuration.AddEnvironmentVariables();
 
             // Add services to the container.
 
@@ -11,7 +13,9 @@ namespace FileManager {
 
             // Configure the HTTP request pipeline.
 
-            app.UseHttpsRedirection();
+            if (builder.Configuration.GetValue<bool>("UseHttpsRedirection", true)) {
+                app.UseHttpsRedirection();
+            }
 
             app.UseStaticFiles();
 

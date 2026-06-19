@@ -36,6 +36,7 @@ Bonus Features:
 - Include a deep search mechanic that would search nested folders for a text string
 - Multi-file downloads
 - DOM Performance: Do not list all files at once in the DOM.  Implement a virtual scroller that only renders the DOM elements that are actively on the screen and then reuses them as scrolling occurs.   This will be particularly useful when folders exceed hundreds of thousands items.
+- Add Loading indicators
 
 ### AI Usage:
 
