@@ -43,11 +43,6 @@
         return path === '' || path === '/' ? '' : path.replace(/^\//, '');
     }
 
-    function normalizePath(path) {
-        if (!path) return '';
-        return path.replace(/^\/+|\/+$/g, '');
-    }
-
     /**
      * Initialize Application
      * On load, read the current pathname and optional search query from the browser location.
@@ -82,8 +77,9 @@
      */
     async function navigateToPath(path, search, replaceHistory = false) {
         try {
-            path = normalizePath(path);
-            search = search || '';
+            // default path to "" if empty and remove all leading/trailing spaces
+            path = (path ?? '').replace(/^\/+|\/+$/g, '');
+            search = search ?? '';
 
             // Load Directory Listing
             // TODO: Add Loading Indicator
@@ -505,6 +501,6 @@
 
     function hideModalLoading() {
         const el = document.getElementById('modalLoadingOverlay');
-        // if (el) el.classList.add('hidden');
+        if (el) el.classList.add('hidden');
     }
 })();
