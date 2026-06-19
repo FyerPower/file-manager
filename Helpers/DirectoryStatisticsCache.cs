@@ -1,71 +1,93 @@
 using System.Collections.Concurrent;
 
-namespace FileManager.Helpers {
+namespace FileManager.Helpers
+{
     // Thread-safe cache for directory statistics (size and file count).
     // Populates cache recursively and exposes methods to update cache on file create/delete/move.
-    public static class DirectoryStatisticsCache{
+    public static class DirectoryStatisticsCache
+    {
         private static readonly ConcurrentDictionary<string, (long TotalSize, long FileCount)> _cache = new();
 
-        public static (long? TotalSize, long? FileCount) GetStatistics(string dirFullPath) {
-            try {
-                return GetStatistics( new DirectoryInfo(dirFullPath) );
-            } catch {
+        public static (long? TotalSize, long? FileCount) GetStatistics(string dirFullPath)
+        {
+            try
+            {
+                return GetStatistics(new DirectoryInfo(dirFullPath));
+            }
+            catch
+            {
                 return (null, null);
             }
         }
 
         // Public getter. Returns (TotalSize, FileCount) or (null,null) on failure.
-        public static (long? TotalSize, long? FileCount) GetStatistics(DirectoryInfo dir) {
-            try {
+        public static (long? TotalSize, long? FileCount) GetStatistics(DirectoryInfo dir)
+        {
+            try
+            {
                 // Try to get from cachce
-                if (_cache.TryGetValue(dir.FullName, out var v)) {
+                if (_cache.TryGetValue(dir.FullName, out var v))
+                {
                     return (v.TotalSize, v.FileCount);
                 }
-                
+
                 // If directory does not exist
                 if (!dir.Exists) return (0, 0);
-                
+
                 // Init counters
                 long total = 0;
                 long count = 0;
 
                 // Process Files
-                try { 
-                    foreach (var f in dir.GetFiles()) {
-                        try { 
-                            total += f.Length; 
-                            count++; 
-                        } catch { }
+                try
+                {
+                    foreach (var f in dir.GetFiles())
+                    {
+                        try
+                        {
+                            total += f.Length;
+                            count++;
+                        }
+                        catch { }
                     }
-                } catch { }
-                
+                }
+                catch { }
+
                 // Process Directories (Recursively)
-                try { 
-                    foreach (var subDir in dir.GetDirectories()) {
-                        try {
+                try
+                {
+                    foreach (var subDir in dir.GetDirectories())
+                    {
+                        try
+                        {
                             var child = GetStatistics(subDir);
                             total += child.TotalSize ?? 0;
                             count += child.FileCount ?? 0;
                         }
                         catch { }
                     }
-                } catch { }
+                }
+                catch { }
 
                 // Set cache
                 _cache[dir.FullName] = (total, count);
 
                 // Return directory statistics
                 return (total, count);
-            } catch {
+            }
+            catch
+            {
                 return (null, null);
             }
         }
 
         // Remove cache entries for a directory subtree
-        public static void RemoveDirectoryFromCache(string dirFullPath) {
+        public static void RemoveDirectoryFromCache(string dirFullPath)
+        {
             // Get a list of all cached entries that existed in the source folder.   We will need to update those records
             var directoryAndChildrenDir = _cache.Where(kvp => kvp.Key.StartsWith(dirFullPath, StringComparison.OrdinalIgnoreCase)).ToList();
-            foreach (var kvPair in directoryAndChildrenDir) {
+            foreach (var kvPair in directoryAndChildrenDir)
+            {
                 _cache.TryRemove(kvPair.Key, out _);
             }
         }
@@ -73,45 +95,53 @@ namespace FileManager.Helpers {
         /**
          *  Handle file moves.   Under the covers, it essentially treats this as a delete / create
          */
-        public static void HandleFileCreated(string newFullPath, long size) {
+        public static void HandleFileCreated(string newFullPath, long size)
+        {
             WalkParentCacheAndModify(newFullPath, size, 1);
         }
-        
+
         /**
          *  Handle file moves.   Under the covers, it essentially treats this as a delete / create
          */
-        public static void HandleFileDeleted(string oldFullPath, long size) {
+        public static void HandleFileDeleted(string oldFullPath, long size)
+        {
             WalkParentCacheAndModify(oldFullPath, -1 * size, -1);
         }
-        
+
         /**
          *  Handle file moves.   Under the covers, it essentially treats this as a delete / create
          */
-        public static void HandleFileMoved(string oldFullPath, string newFullPath, long size) {
+        public static void HandleFileMoved(string oldFullPath, string newFullPath, long size)
+        {
             WalkParentCacheAndModify(oldFullPath, -1 * size, -1);
             WalkParentCacheAndModify(newFullPath, size, 1);
         }
-        
+
         /**
          *  Handle file moves.   Under the covers, it essentially treats this as a delete / create
          */
-        public static void HandleFolderCreate(string newFullPath) {
+        public static void HandleFolderCreate(string newFullPath)
+        {
             _cache[newFullPath] = (0, 0);
         }
 
-        
+
 
         // Handle directory moved: transfer cached subtree entries if present, otherwise fallback to recalculation
-        public static void HandleDirectoryMoved(string oldFullPath, string newFullPath) {
-            try {
+        public static void HandleDirectoryMoved(string oldFullPath, string newFullPath)
+        {
+            try
+            {
                 // Get a list of all cached entries that existed in the source folder.   We will need to update those records
                 var movedDict = _cache.Where(kvPair => kvPair.Key.StartsWith(oldFullPath, StringComparison.OrdinalIgnoreCase)).ToList();
                 // Find the cached record for the root folder (oldFullPath)
                 var rootEntry = movedDict.FirstOrDefault(kvp => string.Equals(kvp.Key, oldFullPath, StringComparison.OrdinalIgnoreCase));
                 // If we found the root entry
-                if (rootEntry.Key != null) {
+                if (rootEntry.Key != null)
+                {
                     // Transfer entries from old to new paths
-                    foreach (var kvp in movedDict) {
+                    foreach (var kvp in movedDict)
+                    {
                         // Get the suffix (everything after the folder we're moving from)
                         var suffix = kvp.Key.Substring(oldFullPath.Length);
                         // Set the new path, and remove the old
@@ -136,7 +166,8 @@ namespace FileManager.Helpers {
                 var newDirStats = GetStatistics(newFullPath);
                 long totalSize = newDirStats.TotalSize ?? -1;
                 long fileCount = newDirStats.FileCount ?? -1;
-                if (totalSize != -1 && fileCount != -1) {
+                if (totalSize != -1 && fileCount != -1)
+                {
                     WalkParentCacheAndModify(newFullPath, totalSize, fileCount);
                 }
             }
@@ -144,9 +175,12 @@ namespace FileManager.Helpers {
         }
 
         // Handle directory deletion: remove subtree and update ancestors using cached totals when available
-        public static void HandleDirectoryDeleted(string dirFullPath) {
-            try {
-                if (_cache.TryGetValue(dirFullPath, out var removed)) {
+        public static void HandleDirectoryDeleted(string dirFullPath)
+        {
+            try
+            {
+                if (_cache.TryGetValue(dirFullPath, out var removed))
+                {
                     // Remove subtree entries
                     RemoveDirectoryFromCache(dirFullPath);
                     // Subtract totals from cached ancestors only
@@ -156,20 +190,25 @@ namespace FileManager.Helpers {
             catch { }
         }
 
-        private static void WalkParentCacheAndModify(string fileFullPath, long size, long count) {
-            try {
+        private static void WalkParentCacheAndModify(string fileFullPath, long size, long count)
+        {
+            try
+            {
                 // Start updating from the current folder
                 var dir = Path.GetDirectoryName(fileFullPath);
                 // While dir is set
-                while (!string.IsNullOrEmpty(dir)) {
+                while (!string.IsNullOrEmpty(dir))
+                {
                     // Try to load the directory from cache and decrement the size / count
-                    if (_cache.TryGetValue(dir, out var cur)) {
+                    if (_cache.TryGetValue(dir, out var cur))
+                    {
                         var newSize = Math.Max(0, cur.TotalSize + size);
                         var newCount = Math.Max(0, cur.FileCount + count);
                         _cache[dir] = (newSize, newCount);
-                    } 
+                    }
                     // Fallback: no cache? getStatstics will recalculate & cache new metrics
-                    else {
+                    else
+                    {
                         GetStatistics(dir);
                     }
                     // Because we changed this directory, we now need to update the parent directory
