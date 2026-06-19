@@ -89,8 +89,8 @@
             // TODO: Add Loading Indicator
             const items = await api.get('/api', {
                 params: { search, path },
-                beforeFetch: () => { console.log("Loading"); },
-                afterFetch: (ms) => { $queryTimeResults.innerHTML = `Latest Fetch Time: ${ms} ms`; }
+                beforeFetch: () => { showModalLoading(); },
+                afterFetch: (ms) => { hideModalLoading(); $queryTimeResults.innerHTML = `Latest Fetch Time: ${ms} ms`; }
             });
 
             // Update the current path to the provided path
@@ -127,6 +127,7 @@
                 // If history API isn't available for any reason, silently ignore
             }
         } catch (e) {
+            hideModalLoading();
             alert('Failed to load directory');
         }
     }
@@ -493,5 +494,17 @@
         }
 
         return `${size.toFixed(size < 10 && unit > 0 ? 1 : 0)} ${units[unit]}`;
+    }
+
+
+    // Modal loading overlay helpers
+    function showModalLoading() {
+        const el = document.getElementById('modalLoadingOverlay');
+        if (el) el.classList.remove('hidden');
+    }
+
+    function hideModalLoading() {
+        const el = document.getElementById('modalLoadingOverlay');
+        // if (el) el.classList.add('hidden');
     }
 })();
