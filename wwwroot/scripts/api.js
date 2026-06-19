@@ -60,7 +60,6 @@
             options.method = 'DELETE';
             return await this.execute(url, options);
         }
-
     }
 
     // Expose to entire webpage
