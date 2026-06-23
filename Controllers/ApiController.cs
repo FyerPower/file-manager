@@ -219,9 +219,6 @@ namespace FileManager.Controllers
                 await using var targetStream = System.IO.File.Create(fullPath);
                 await file.CopyToAsync(targetStream);
 
-                // Update cache for newly created file
-                try { _directoryStatisticsCache.HandleFileCreated(fullPath, file.Length); } catch { }
-
                 return Ok(new { message = "File created successfully" });
             }
             catch (Exception ex)
@@ -264,8 +261,6 @@ namespace FileManager.Controllers
             }
 
             Directory.CreateDirectory(fullPath);
-            // Ensure cache updated for new (empty) directory
-            try { _directoryStatisticsCache.HandleFolderCreate(fullPath); } catch { }
             return Ok(new { message = "Folder created successfully" });
         }
 
@@ -311,7 +306,6 @@ namespace FileManager.Controllers
                     long size = 0;
                     try { var fi = new FileInfo(fullPath); size = fi.Length; } catch { }
                     System.IO.File.Delete(fullPath);
-                    try { _directoryStatisticsCache.HandleFileDeleted(fullPath, size); } catch { }
                     return Ok(new { message = "Deleted successfully" });
                 }
 
@@ -319,7 +313,6 @@ namespace FileManager.Controllers
                 if (Directory.Exists(fullPath))
                 {
                     Directory.Delete(fullPath, true);
-                    try { _directoryStatisticsCache.HandleDirectoryDeleted(fullPath); } catch { }
                     return Ok(new { message = "Deleted successfully" });
                 }
 
@@ -401,7 +394,6 @@ namespace FileManager.Controllers
                     long size = 0;
                     try { var fi = new FileInfo(sourceFullPath); size = fi.Length; } catch { }
                     System.IO.File.Move(sourceFullPath, destinationFullPath);
-                    try { _directoryStatisticsCache.HandleFileMoved(sourceFullPath, destinationFullPath, size); } catch { }
 
                     // Return a 200 OK response with a success message indicating that the file was moved successfully
                     return Ok(new { message = "Moved successfully" });
@@ -426,7 +418,6 @@ namespace FileManager.Controllers
 
                     // Move the directory to the destination path
                     Directory.Move(sourceFullPath, destinationFullPath);
-                    try { _directoryStatisticsCache.HandleDirectoryMoved(sourceFullPath, destinationFullPath); } catch { }
 
                     // Return a 200 OK response with a success message indicating that the directory was moved successfully
                     return Ok(new { message = "Moved successfully" });
@@ -499,7 +490,6 @@ namespace FileManager.Controllers
 
                     // Update cache for the new file
                     var fileInformation = new FileInfo(destinationPath);
-                    _directoryStatisticsCache.HandleFileCreated(destinationPath, fileInformation.Length);
 
                     return Ok(new { message = $"File duplicated successfully to {path}" });
                 }
@@ -521,9 +511,6 @@ namespace FileManager.Controllers
 
                     // Recursively copy directory
                     CopyDirectory(sourceFullPath, destinationPath);
-
-                    // Update cache for the duplicated directory tree
-                    _directoryStatisticsCache.GetStatistics(destinationPath);
 
                     return Ok(new { message = $"Directory duplicated successfully to {path}" });
                 }

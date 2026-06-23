@@ -230,8 +230,8 @@ namespace FileManager.Helpers
             {
                 // Start updating from the current folder
                 var dir = Path.GetDirectoryName(fileFullPath);
-                // While dir is set
-                while (!string.IsNullOrEmpty(dir))
+                // While dir is set and is still within our root directory (allowing root itself)
+                while (!string.IsNullOrEmpty(dir) && _directoryHelper.IsWithinRootDirectory(dir, true))
                 {
                     // Try to load the directory from cache and decrement the size / count
                     if (_cache.TryGetValue(dir, out var cur))

@@ -70,11 +70,7 @@ The application is built and bundled into a docker image that can be deployed ne
 
 ## Known Issues
 
-**Problem:** If files are updated outside of the application, the cache becomes stale and reports the wrong information
-
-- **Solution A:** Implement a file watcher that finds any file recently modified, created, or deleted and then update cache accordingly.   This step will definitely add overhead cost and may not be necessary depending on its use-case, for example if files are ALWAYS managed through this application, then there is no need to watch externally. 
-
-- **Solution B:** Limit the length of the cache by a time-constraint.   This will ensure that if files / folders are changed outside, metrics will quickly be updated based on the time expiration.   Consideration must then be determined how long that time limit it.  Longer times could result in more data being wrong, while Shorter times would result in more overhead / computing cost.
+**Problem:** Files with spaces in the name are not handled properly due to url serialization.
 
 ## Improvements
 

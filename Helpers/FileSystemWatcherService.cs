@@ -25,7 +25,6 @@ namespace FileManager.Helpers
             watcher.Created += OnCreated;
             watcher.Deleted += OnDeleted;
             watcher.Renamed += OnRenamed;
-            watcher.Changed += OnChanged;
             watcher.Error += OnError;
 
             // Monitor the lifetime of our application and on its stop we need to properly clean up the file system watcher
@@ -76,22 +75,6 @@ namespace FileManager.Helpers
                 else if (Directory.Exists(e.FullPath))
                 {
                     _directoryStatisticsCache.HandleDirectoryMoved(e.OldFullPath, e.FullPath);
-                }
-            }
-            catch { }
-        }
-
-        private void OnChanged(object sender, FileSystemEventArgs e)
-        {
-            try
-            {
-                if (File.Exists(e.FullPath))
-                {
-                    var parentDir = Path.GetDirectoryName(e.FullPath);
-                    if (!string.IsNullOrEmpty(parentDir))
-                    {
-                        _directoryStatisticsCache.ForceRefreshDirectory(parentDir);
-                    }
                 }
             }
             catch { }
