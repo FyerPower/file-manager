@@ -11,16 +11,27 @@ namespace FileManager
 
             builder.Configuration.AddEnvironmentVariables();
 
+            // Get the root directory from configuration
+            var rootDirectory = builder.Configuration.GetValue<string>("RootDirectory");
+
+            // Validate root directory exists before starting the app
+            if (!Directory.Exists(rootDirectory))
+            {
+                Console.WriteLine($"Fatal: RootDirectory does not exist: {rootDirectory}");
+                return;
+            }
+
             // Add services to the container.
             builder.Services.AddControllers();
+            builder.Services.AddSingleton(new DirectoryHelper(rootDirectory));
+            builder.Services.AddSingleton<DirectoryStatisticsCache>();
+            builder.Services.AddSingleton<FileSystemWatcherService>();
 
             var app = builder.Build();
 
-            // Get the root directory from configuration
-            var rootDirectory = DirectoryHelper.NormalizePath(builder.Configuration.GetValue<string>("RootDirectory") ?? "C:/TestFiles");
-
             // Start file system watcher to keep directory statistics cache up to date
-            FileSystemWatcherService.CreateAndStart(rootDirectory, app.Lifetime);
+            var watcherService = app.Services.GetRequiredService<FileSystemWatcherService>();
+            watcherService.CreateAndStart(rootDirectory, app.Lifetime);
 
             // Configure the HTTP request pipeline.
             if (builder.Configuration.GetValue<bool>("UseHttpsRedirection", true))

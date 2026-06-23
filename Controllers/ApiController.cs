@@ -9,14 +9,14 @@ namespace FileManager.Controllers
     {
 
         private readonly ILogger<ApiController> _logger;
-        private readonly string _rootDirectory;
+        private readonly DirectoryHelper _directoryHelper;
+        private readonly DirectoryStatisticsCache _directoryStatisticsCache;
 
-        public ApiController(IConfiguration configuration, ILogger<ApiController> logger)
+        public ApiController(IConfiguration configuration, ILogger<ApiController> logger, DirectoryHelper directoryHelper, DirectoryStatisticsCache directoryStatisticsCache)
         {
             _logger = logger;
-
-            // Get the root directory from configuration (appsettings.json)
-            _rootDirectory = DirectoryHelper.NormalizePath(Path.GetFullPath(configuration.GetValue<string>("RootDirectory") ?? "C:/TestFiles"));
+            _directoryHelper = directoryHelper;
+            _directoryStatisticsCache = directoryStatisticsCache;
         }
 
         /**
@@ -43,11 +43,11 @@ namespace FileManager.Controllers
                 // Determine the target path based on the provided path parameter
                 //   - If no path is provided, use the root directory
                 //   - If the path is provided, combine it with the root directory
-                string fullPath = string.IsNullOrWhiteSpace(path) ? _rootDirectory : Path.Combine(_rootDirectory, path);
-                fullPath = DirectoryHelper.NormalizePath(fullPath);
+                string fullPath = string.IsNullOrWhiteSpace(path) ? _directoryHelper.RootDirectory : Path.Combine(_directoryHelper.RootDirectory, path);
+                fullPath = _directoryHelper.NormalizePath(fullPath);
 
                 // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
-                if (!IsWithinRootDirectory(fullPath, true))
+                if (!_directoryHelper.IsWithinRootDirectory(fullPath, true))
                 {
                     return BadRequest(new { error = "Invalid path - access denied" });
                 }
@@ -69,7 +69,7 @@ namespace FileManager.Controllers
                 // Get all directories
                 foreach (var dir in directory.GetDirectories(query))
                 {
-                    var stats = DirectoryStatisticsCache.GetStatistics(dir.FullName);
+                    var stats = _directoryStatisticsCache.GetStatistics(dir.FullName);
                     items.Add(new FolderItem { Name = dir.Name, Type = "folder", Size = stats.TotalSize, FileCount = stats.FileCount });
                 }
 
@@ -118,11 +118,11 @@ namespace FileManager.Controllers
             try
             {
                 // Combine the provided path with the root directory to get the full path of the target file
-                string fullPath = Path.Combine(_rootDirectory, request.Path);
-                fullPath = DirectoryHelper.NormalizePath(fullPath);
+                string fullPath = Path.Combine(_directoryHelper.RootDirectory, request.Path);
+                fullPath = _directoryHelper.NormalizePath(fullPath);
 
                 // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
-                if (!IsWithinRootDirectory(fullPath))
+                if (!_directoryHelper.IsWithinRootDirectory(fullPath))
                 {
                     return BadRequest(new { error = "Invalid path - access denied" });
                 }
@@ -193,11 +193,11 @@ namespace FileManager.Controllers
         private async Task<IActionResult> UploadFile(string? path, IFormFile file)
         {
             // Determine the fullpath based on the provided path parameter
-            string fullPath = string.IsNullOrWhiteSpace(path) ? _rootDirectory : Path.Combine(_rootDirectory, path);
-            fullPath = DirectoryHelper.NormalizePath(fullPath);
+            string fullPath = string.IsNullOrWhiteSpace(path) ? _directoryHelper.RootDirectory : Path.Combine(_directoryHelper.RootDirectory, path);
+            fullPath = _directoryHelper.NormalizePath(fullPath);
 
             // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
-            if (!IsWithinRootDirectory(fullPath))
+            if (!_directoryHelper.IsWithinRootDirectory(fullPath))
             {
                 return BadRequest(new { error = "Invalid path - access denied" });
             }
@@ -210,7 +210,7 @@ namespace FileManager.Controllers
                     return Conflict(new { error = "A file or folder already exists at the specified path" });
                 }
 
-                string directoryPath = Path.GetDirectoryName(fullPath) ?? _rootDirectory;
+                string directoryPath = Path.GetDirectoryName(fullPath) ?? _directoryHelper.RootDirectory;
                 if (!Directory.Exists(directoryPath))
                 {
                     Directory.CreateDirectory(directoryPath);
@@ -220,7 +220,7 @@ namespace FileManager.Controllers
                 await file.CopyToAsync(targetStream);
 
                 // Update cache for newly created file
-                try { DirectoryStatisticsCache.HandleFileCreated(fullPath, file.Length); } catch { }
+                try { _directoryStatisticsCache.HandleFileCreated(fullPath, file.Length); } catch { }
 
                 return Ok(new { message = "File created successfully" });
             }
@@ -248,11 +248,11 @@ namespace FileManager.Controllers
          */
         private async Task<IActionResult> CreateFolder(string path)
         {
-            string fullPath = Path.Combine(_rootDirectory, path);
-            fullPath = DirectoryHelper.NormalizePath(fullPath);
+            string fullPath = Path.Combine(_directoryHelper.RootDirectory, path);
+            fullPath = _directoryHelper.NormalizePath(fullPath);
 
             // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
-            if (!IsWithinRootDirectory(fullPath))
+            if (!_directoryHelper.IsWithinRootDirectory(fullPath))
             {
                 return BadRequest(new { error = "Invalid path - access denied" });
             }
@@ -265,7 +265,7 @@ namespace FileManager.Controllers
 
             Directory.CreateDirectory(fullPath);
             // Ensure cache updated for new (empty) directory
-            try { DirectoryStatisticsCache.HandleFolderCreate(fullPath); } catch { }
+            try { _directoryStatisticsCache.HandleFolderCreate(fullPath); } catch { }
             return Ok(new { message = "Folder created successfully" });
         }
 
@@ -296,11 +296,11 @@ namespace FileManager.Controllers
             try
             {
                 // Get the full target path
-                string fullPath = Path.Combine(_rootDirectory, path);
-                fullPath = DirectoryHelper.NormalizePath(fullPath);
+                string fullPath = Path.Combine(_directoryHelper.RootDirectory, path);
+                fullPath = _directoryHelper.NormalizePath(fullPath);
 
                 // Validate the file or directory is within the root directory ( prevents ../ attacks )
-                if (!IsWithinRootDirectory(fullPath))
+                if (!_directoryHelper.IsWithinRootDirectory(fullPath))
                 {
                     return BadRequest(new { error = "Invalid path - access denied" });
                 }
@@ -311,7 +311,7 @@ namespace FileManager.Controllers
                     long size = 0;
                     try { var fi = new FileInfo(fullPath); size = fi.Length; } catch { }
                     System.IO.File.Delete(fullPath);
-                    try { DirectoryStatisticsCache.HandleFileDeleted(fullPath, size); } catch { }
+                    try { _directoryStatisticsCache.HandleFileDeleted(fullPath, size); } catch { }
                     return Ok(new { message = "Deleted successfully" });
                 }
 
@@ -319,7 +319,7 @@ namespace FileManager.Controllers
                 if (Directory.Exists(fullPath))
                 {
                     Directory.Delete(fullPath, true);
-                    try { DirectoryStatisticsCache.HandleDirectoryDeleted(fullPath); } catch { }
+                    try { _directoryStatisticsCache.HandleDirectoryDeleted(fullPath); } catch { }
                     return Ok(new { message = "Deleted successfully" });
                 }
 
@@ -364,13 +364,13 @@ namespace FileManager.Controllers
 
             try
             {
-                string sourceFullPath = Path.Combine(_rootDirectory, sourcePath);
-                sourceFullPath = DirectoryHelper.NormalizePath(sourceFullPath);
-                string destinationFullPath = Path.Combine(_rootDirectory, destinationPath ?? "");
-                destinationFullPath = DirectoryHelper.NormalizePath(destinationFullPath);
+                string sourceFullPath = Path.Combine(_directoryHelper.RootDirectory, sourcePath);
+                sourceFullPath = _directoryHelper.NormalizePath(sourceFullPath);
+                string destinationFullPath = Path.Combine(_directoryHelper.RootDirectory, destinationPath ?? "");
+                destinationFullPath = _directoryHelper.NormalizePath(destinationFullPath);
 
                 // Validate both source and destination paths are within the root directory ( prevents ../ attacks )
-                if (!IsWithinRootDirectory(sourceFullPath) || !IsWithinRootDirectory(destinationFullPath))
+                if (!_directoryHelper.IsWithinRootDirectory(sourceFullPath) || !_directoryHelper.IsWithinRootDirectory(destinationFullPath))
                 {
                     return BadRequest(new { error = "Source and destination must be within the root directory" });
                 }
@@ -401,7 +401,7 @@ namespace FileManager.Controllers
                     long size = 0;
                     try { var fi = new FileInfo(sourceFullPath); size = fi.Length; } catch { }
                     System.IO.File.Move(sourceFullPath, destinationFullPath);
-                    try { DirectoryStatisticsCache.HandleFileMoved(sourceFullPath, destinationFullPath, size); } catch { }
+                    try { _directoryStatisticsCache.HandleFileMoved(sourceFullPath, destinationFullPath, size); } catch { }
 
                     // Return a 200 OK response with a success message indicating that the file was moved successfully
                     return Ok(new { message = "Moved successfully" });
@@ -426,7 +426,7 @@ namespace FileManager.Controllers
 
                     // Move the directory to the destination path
                     Directory.Move(sourceFullPath, destinationFullPath);
-                    try { DirectoryStatisticsCache.HandleDirectoryMoved(sourceFullPath, destinationFullPath); } catch { }
+                    try { _directoryStatisticsCache.HandleDirectoryMoved(sourceFullPath, destinationFullPath); } catch { }
 
                     // Return a 200 OK response with a success message indicating that the directory was moved successfully
                     return Ok(new { message = "Moved successfully" });
@@ -469,11 +469,11 @@ namespace FileManager.Controllers
 
             try
             {
-                string sourceFullPath = Path.Combine(_rootDirectory, path);
-                sourceFullPath = DirectoryHelper.NormalizePath(sourceFullPath);
+                string sourceFullPath = Path.Combine(_directoryHelper.RootDirectory, path);
+                sourceFullPath = _directoryHelper.NormalizePath(sourceFullPath);
 
                 // Security Guard: Validate the path is within the root directory
-                if (!IsWithinRootDirectory(sourceFullPath))
+                if (!_directoryHelper.IsWithinRootDirectory(sourceFullPath))
                 {
                     return BadRequest(new { error = "Invalid path - access denied" });
                 }
@@ -499,7 +499,7 @@ namespace FileManager.Controllers
 
                     // Update cache for the new file
                     var fileInformation = new FileInfo(destinationPath);
-                    DirectoryStatisticsCache.HandleFileCreated(destinationPath, fileInformation.Length);
+                    _directoryStatisticsCache.HandleFileCreated(destinationPath, fileInformation.Length);
 
                     return Ok(new { message = $"File duplicated successfully to {path}" });
                 }
@@ -523,7 +523,7 @@ namespace FileManager.Controllers
                     CopyDirectory(sourceFullPath, destinationPath);
 
                     // Update cache for the duplicated directory tree
-                    DirectoryStatisticsCache.GetStatistics(destinationPath);
+                    _directoryStatisticsCache.GetStatistics(destinationPath);
 
                     return Ok(new { message = $"Directory duplicated successfully to {path}" });
                 }
@@ -560,23 +560,6 @@ namespace FileManager.Controllers
                 string destSubDir = Path.Combine(destDir, dir.Name);
                 CopyDirectory(dir.FullName, destSubDir);
             }
-        }
-
-        /**
-         * Security Guard: Validate the path is within the root directory
-         * This will prevent users from performing directory traversal attacks (e.g., using "../" to access parent directories)
-         * 
-         * The method works by:
-         *   - Getting the full absolute path of the root directory.
-         *   - Checking if the provided full path starts with the full root path (case-insensitive comparison).
-         *   - Ensuring that the provided full path is longer than the full root path, which prevents access to the root directory itself.
-         * 
-         * This was commonly reused in multiple endpoints, so I extracted it to a separate method for better code organization and readability.
-         */
-        private bool IsWithinRootDirectory(string fullPath, bool allowRootAccess = false)
-        {
-            string fullRootPath = Path.GetFullPath(_rootDirectory);
-            return fullPath.StartsWith(fullRootPath, StringComparison.OrdinalIgnoreCase) && (allowRootAccess || fullPath.Length > fullRootPath.Length);
         }
 
     }

@@ -4,11 +4,17 @@ namespace FileManager.Helpers
 {
     // Thread-safe cache for directory statistics (size and file count).
     // Populates cache recursively and exposes methods to update cache on file create/delete/move.
-    public static class DirectoryStatisticsCache
+    public class DirectoryStatisticsCache
     {
-        private static readonly ConcurrentDictionary<string, (long TotalSize, long FileCount)> _cache = new();
+        private readonly ConcurrentDictionary<string, (long TotalSize, long FileCount)> _cache = new();
+        private readonly DirectoryHelper _directoryHelper;
 
-        public static (long? TotalSize, long? FileCount) GetStatistics(string dirFullPath)
+        public DirectoryStatisticsCache(DirectoryHelper directoryHelper)
+        {
+            _directoryHelper = directoryHelper;
+        }
+
+        public (long? TotalSize, long? FileCount) GetStatistics(string dirFullPath)
         {
             try
             {
@@ -21,7 +27,7 @@ namespace FileManager.Helpers
         }
 
         // Public getter. Returns (TotalSize, FileCount) or (null,null) on failure.
-        public static (long? TotalSize, long? FileCount) GetStatistics(DirectoryInfo dir)
+        public (long? TotalSize, long? FileCount) GetStatistics(DirectoryInfo dir)
         {
             try
             {
@@ -82,7 +88,7 @@ namespace FileManager.Helpers
         }
 
         // Remove cache entries for a directory subtree
-        public static void RemoveDirectoryFromCache(string dirFullPath)
+        public void RemoveDirectoryFromCache(string dirFullPath)
         {
             // Get a list of all cached entries that existed in the source folder.   We will need to update those records
             var directoryAndChildrenDir = _cache.Where(kvp => kvp.Key.StartsWith(dirFullPath, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -95,7 +101,7 @@ namespace FileManager.Helpers
         /**
          *  Handle file moves.   Under the covers, it essentially treats this as a delete / create
          */
-        public static void HandleFileCreated(string newFullPath, long size)
+        public void HandleFileCreated(string newFullPath, long size)
         {
             WalkParentCacheAndModify(newFullPath, size, 1);
         }
@@ -103,7 +109,7 @@ namespace FileManager.Helpers
         /**
          *  Handle file moves.   Under the covers, it essentially treats this as a delete / create
          */
-        public static void HandleFileDeleted(string oldFullPath, long size)
+        public void HandleFileDeleted(string oldFullPath, long size)
         {
             WalkParentCacheAndModify(oldFullPath, -1 * size, -1);
         }
@@ -111,7 +117,7 @@ namespace FileManager.Helpers
         /**
          *  Handle file moves.   Under the covers, it essentially treats this as a delete / create
          */
-        public static void HandleFileMoved(string oldFullPath, string newFullPath, long size)
+        public void HandleFileMoved(string oldFullPath, string newFullPath, long size)
         {
             WalkParentCacheAndModify(oldFullPath, -1 * size, -1);
             WalkParentCacheAndModify(newFullPath, size, 1);
@@ -120,7 +126,7 @@ namespace FileManager.Helpers
         /**
          *  Handle file moves.   Under the covers, it essentially treats this as a delete / create
          */
-        public static void HandleFolderCreate(string newFullPath)
+        public void HandleFolderCreate(string newFullPath)
         {
             _cache[newFullPath] = (0, 0);
         }
@@ -128,7 +134,7 @@ namespace FileManager.Helpers
 
 
         // Handle directory moved: transfer cached subtree entries if present, otherwise fallback to recalculation
-        public static void HandleDirectoryMoved(string oldFullPath, string newFullPath)
+        public void HandleDirectoryMoved(string oldFullPath, string newFullPath)
         {
             try
             {
@@ -175,7 +181,7 @@ namespace FileManager.Helpers
         }
 
         // Handle directory deletion: remove subtree and update ancestors using cached totals when available
-        public static void HandleDirectoryDeleted(string dirFullPath)
+        public void HandleDirectoryDeleted(string dirFullPath)
         {
             try
             {
@@ -190,7 +196,35 @@ namespace FileManager.Helpers
             catch { }
         }
 
-        private static void WalkParentCacheAndModify(string fileFullPath, long size, long count)
+        public void ForceRefreshDirectory(string dirFullPath)
+        {
+            // Remove the current cache values, if so, we can programmatically shortcut the parent size modifications
+            if (_cache.TryRemove(dirFullPath, out var oldStats))
+            {
+                // Set the new stats into cache (including children)
+                var newStats = GetStatistics(dirFullPath);
+
+                // Calculate the difference between the current size and the old size.
+                var diffSize = ((newStats.TotalSize ?? 0) - oldStats.TotalSize);
+                var diffCount = ((newStats.FileCount ?? 0) - oldStats.FileCount);
+
+                // Update the difference through all the parents
+                WalkParentCacheAndModify(dirFullPath, diffSize, diffCount);
+            }
+            else
+            {
+                GetStatistics(dirFullPath);
+
+                // Navigate the parents
+                var parentDir = Path.GetDirectoryName(dirFullPath);
+                if (parentDir != null && parentDir != String.Empty && _directoryHelper.IsWithinRootDirectory(parentDir))
+                {
+                    ForceRefreshDirectory(parentDir);
+                }
+            }
+        }
+
+        private void WalkParentCacheAndModify(string fileFullPath, long size, long count)
         {
             try
             {

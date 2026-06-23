@@ -2,15 +2,18 @@ using System.IO;
 
 namespace FileManager.Helpers
 {
-    public static class FileSystemWatcherService
+    public class FileSystemWatcherService
     {
-        public static FileSystemWatcher CreateAndStart(string rootDirectory, Microsoft.Extensions.Hosting.IHostApplicationLifetime lifetime)
-        {
-            if (!Directory.Exists(rootDirectory))
-            {
-                return null;
-            }
+        private readonly DirectoryStatisticsCache _directoryStatisticsCache;
 
+        public FileSystemWatcherService(DirectoryStatisticsCache directoryStatisticsCache)
+        {
+            _directoryStatisticsCache = directoryStatisticsCache;
+        }
+
+        public void CreateAndStart(string rootDirectory, Microsoft.Extensions.Hosting.IHostApplicationLifetime lifetime)
+        {
+            // Initialize the FileSystemWatcher and have it monitor Subdirectories too
             var watcher = new FileSystemWatcher(rootDirectory)
             {
                 IncludeSubdirectories = true,
@@ -18,93 +21,67 @@ namespace FileManager.Helpers
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Size | NotifyFilters.LastWrite
             };
 
+            // Subscribe to the events
             watcher.Created += OnCreated;
             watcher.Deleted += OnDeleted;
             watcher.Renamed += OnRenamed;
             watcher.Changed += OnChanged;
             watcher.Error += OnError;
 
+            // Monitor the lifetime of our application and on its stop we need to properly clean up the file system watcher
             lifetime.ApplicationStopping.Register(() => watcher.Dispose());
-
-            return watcher;
         }
 
-        private static void OnCreated(object sender, FileSystemEventArgs e)
+        /**
+         *  Listen to the OnCreated Event (handles both file and folder creation)
+         */
+        private void OnCreated(object sender, FileSystemEventArgs e)
         {
             try
             {
                 if (File.Exists(e.FullPath))
                 {
-                    try
-                    {
-                        var size = new FileInfo(e.FullPath).Length;
-                        DirectoryStatisticsCache.HandleFileCreated(e.FullPath, size);
-                    }
-                    catch
-                    {
-                        var parentDir = Path.GetDirectoryName(e.FullPath);
-                        if (!string.IsNullOrEmpty(parentDir))
-                        {
-                            DirectoryStatisticsCache.RemoveDirectoryFromCache(parentDir);
-                        }
-                    }
+                    var size = new FileInfo(e.FullPath).Length;
+                    _directoryStatisticsCache.HandleFileCreated(e.FullPath, size);
                 }
                 else if (Directory.Exists(e.FullPath))
                 {
-                    DirectoryStatisticsCache.HandleFolderCreate(e.FullPath);
+                    _directoryStatisticsCache.HandleFolderCreate(e.FullPath);
                 }
             }
             catch { }
         }
 
-        private static void OnDeleted(object sender, FileSystemEventArgs e)
+        /**
+         *  Listen to the OnDeleted Event (handles both file and folder creation)
+         */
+        private void OnDeleted(object sender, FileSystemEventArgs e)
         {
             try
             {
-                var parentDir = Path.GetDirectoryName(e.FullPath);
-                if (!string.IsNullOrEmpty(parentDir))
-                {
-                    DirectoryStatisticsCache.RemoveDirectoryFromCache(parentDir);
-                }
+                _directoryStatisticsCache.ForceRefreshDirectory(e.FullPath);
             }
             catch { }
         }
 
-        private static void OnRenamed(object sender, RenamedEventArgs e)
+        private void OnRenamed(object sender, RenamedEventArgs e)
         {
             try
             {
                 if (File.Exists(e.FullPath))
                 {
-                    try
-                    {
-                        var size = new FileInfo(e.FullPath).Length;
-                        DirectoryStatisticsCache.HandleFileCreated(e.FullPath, size);
-                    }
-                    catch
-                    {
-                        var parentDir = Path.GetDirectoryName(e.FullPath);
-                        if (!string.IsNullOrEmpty(parentDir))
-                        {
-                            DirectoryStatisticsCache.RemoveDirectoryFromCache(parentDir);
-                        }
-                    }
+                    FileInfo fileInfo = new FileInfo(e.FullPath);
+                    _directoryStatisticsCache.HandleFileMoved(e.OldFullPath, e.FullPath, fileInfo.Length);
                 }
                 else if (Directory.Exists(e.FullPath))
                 {
-                    DirectoryStatisticsCache.HandleFolderCreate(e.FullPath);
-                }
-
-                var oldParent = Path.GetDirectoryName(e.OldFullPath);
-                if (!string.IsNullOrEmpty(oldParent))
-                {
-                    DirectoryStatisticsCache.RemoveDirectoryFromCache(oldParent);
+                    _directoryStatisticsCache.HandleDirectoryMoved(e.OldFullPath, e.FullPath);
                 }
             }
             catch { }
         }
 
-        private static void OnChanged(object sender, FileSystemEventArgs e)
+        private void OnChanged(object sender, FileSystemEventArgs e)
         {
             try
             {
@@ -113,14 +90,14 @@ namespace FileManager.Helpers
                     var parentDir = Path.GetDirectoryName(e.FullPath);
                     if (!string.IsNullOrEmpty(parentDir))
                     {
-                        DirectoryStatisticsCache.RemoveDirectoryFromCache(parentDir);
+                        _directoryStatisticsCache.ForceRefreshDirectory(parentDir);
                     }
                 }
             }
             catch { }
         }
 
-        private static void OnError(object sender, ErrorEventArgs e)
+        private void OnError(object sender, ErrorEventArgs e)
         {
             Console.WriteLine($"FileSystemWatcher error: {e.GetException().Message}");
         }
