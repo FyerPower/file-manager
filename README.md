@@ -68,17 +68,14 @@ If you're interested in running the code yourself:
 
 The application is built and bundled into a docker image that can be deployed nearly anywhere.  View the `./docker-compose.yml` file for sample deployment.
 
-## Known Issues
-
-**Problem:** Files with spaces in the name are not handled properly due to url serialization.
-
 ## Improvements
 
 - Add drag and drop functionality for uploading of files.
 - Include a deep search mechanic that would search nested folders for a text string
 - Multi-file downloads
 - DOM Performance: Do not list all files at once in the DOM.  Implement a virtual scroller that only renders the DOM elements that are actively on the screen and then reuses them as scrolling occurs.   This will be particularly useful when folders exceed hundreds of thousands items.
-- Add Loading indicators
+- Add More Loading indicators (currently only on file list loading)
+- Keybinds
 
 ## AI Usage:
 

@@ -5,12 +5,25 @@
         queryExecutionTime = 0;
 
         async execute(url, options) {
-            // Build Query Params
-            const queryParams = new URLSearchParams();
-            if (options.params) {
+            // Prepare request
+            options = options || {};
+            options.method = options.method ?? 'GET';
+
+            // If this is a non-GET request and no explicit body provided, but params exist, send params as JSON body.
+            if (options.method !== 'GET' && !options.body && options.params) {
+                options.body = JSON.stringify(options.params);
+                options.headers = Object.assign({}, options.headers, { 'Content-Type': 'application/json' });
+            }
+
+            // Build Query Params for GET requests only
+            let fetchUrl = url;
+            if (options.method === 'GET' && options.params) {
+                const queryParams = new URLSearchParams();
                 for (const [key, value] of Object.entries(options.params)) {
-                    if (value) queryParams.append(key, value);
+                    if (value !== undefined && value !== null) queryParams.append(key, value);
                 }
+                const qs = queryParams.toString();
+                if (qs) fetchUrl = url + `?${qs}`;
             }
 
             // Before Fetch Callback
@@ -18,7 +31,7 @@
 
             // Execute Query (Benchmark it)
             const start = performance.now();
-            const response = await fetch(url + `?${queryParams.toString()}`, {
+            const response = await fetch(fetchUrl, {
                 method: options.method ?? 'GET',
                 headers: options.headers ?? undefined,
                 body: options.body ?? undefined

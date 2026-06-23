@@ -83,7 +83,7 @@
 
             // Load Directory Listing
             // TODO: Add Loading Indicator
-            const items = await api.get('/api', {
+            const items = await api.post('/api/list', {
                 params: { search, path },
                 beforeFetch: () => { showModalLoading(); },
                 afterFetch: (ms) => { hideModalLoading(); $queryTimeResults.innerHTML = `Latest Fetch Time: ${ms} ms`; }
@@ -287,9 +287,8 @@
 
     async function downloadFile(filePath, fileName) {
         try {
-            const blob = await api.post('/api/download', {
-                body: JSON.stringify({ path: filePath }),
-                headers: { 'Content-Type': 'application/json' },
+            const blob = await api.post('/api/download-file', {
+                params: { path: filePath },
                 responseType: 'blob'
             });
 
@@ -361,10 +360,10 @@
         const folderPath = (currentPath ? currentPath + '/' : '') + folderName + '/';
         try {
             // Send POST request to the server to create the new folder
-            await api.post('/api', {
-                params: { path: encodeURIComponent(folderPath) },
-                beforeFetch: () => { console.log("Duplicating"); },
-                afterFetch: (ms) => { console.log("Duplicating", ms); }
+            await api.post('/api/create', {
+                params: { path: folderPath },
+                beforeFetch: () => { console.log("Creating folder"); },
+                afterFetch: (ms) => { console.log("Created folder", ms); }
             });
             // After successfully creating the folder.. refresh the view.
             refreshFileList();
@@ -394,9 +393,10 @@
         try {
             // Build the full path the file for use on upload
             const path = (currentPath ? currentPath + '/' : '') + file.name;
-            // Upload to backend api
+            // Add path to form data and upload to backend api
+            formData.append('path', path);
             // TODO: Add Loading Indicator
-            await api.post('/api', { params: { path }, body: formData });
+            await api.post('/api/upload', { body: formData });
             // On success, clear the file input and refresh the file list.
             input.value = '';
             refreshFileList();
@@ -418,7 +418,7 @@
                 const name = src.split('/').pop();
                 const destination = dst.endsWith('/') || dst === '' ? dst + name : (dst + '/' + name);
                 // TODO: Add Loading Indicator
-                await api.put('/api', {
+                await api.post('/api/move', {
                     params: { sourcePath: src, destinationPath: destination },
                     beforeFetch: () => { console.log("Moving File"); },
                     afterFetch: (ms) => { console.log("Successfully Moved File", ms); }
@@ -439,8 +439,8 @@
         try {
             for (const path of Array.from(selectedItems)) {
                 // TODO: Add loading indicator
-                await api.delete('/api', {
-                    params: { path: encodeURIComponent(path) },
+                await api.post('/api/delete', {
+                    params: { path },
                     beforeFetch: () => { console.log("Deleting Object"); },
                     afterFetch: (ms) => { console.log("Successfully Deleted Object", ms); }
                 });
@@ -460,11 +460,11 @@
             for (const path of Array.from(selectedItems)) {
                 // TODO: Add Loading Indicator Per Item
                 await api.post('/api/duplicate', {
-                    params: { path: encodeURIComponent(path) },
+                    params: { path },
                     beforeFetch: () => { console.log("Duplicating"); },
                     afterFetch: (ms) => { console.log("Duplicating", ms); }
                 });
-                selectedItems.delete(p);
+                selectedItems.delete(path);
             }
             updateActionButtons();
             refreshFileList();

@@ -35,11 +35,14 @@ namespace FileManager.Controllers
          *   - 404 Not Found: If the specified directory does not exist.
          *   - 500 Internal Server Error: If an error occurs during the directory reading process.
          */
-        [HttpGet]
-        public IActionResult Get(string? path = null, string? search = null)
+        [HttpPost("list")]
+        public IActionResult List([FromBody] ListRequest? request)
         {
             try
             {
+                var path = request?.Path;
+                var search = request?.Search;
+
                 // Determine the target path based on the provided path parameter
                 //   - If no path is provided, use the root directory
                 //   - If the path is provided, combine it with the root directory
@@ -107,7 +110,7 @@ namespace FileManager.Controllers
          *   - 404 Not Found: If the file does not exist.
          *   - 500 Internal Server Error: If an error occurs during the download process.
          */
-        [HttpPost("download")]
+        [HttpPost("download-file")]
         public IActionResult DownloadFile([FromBody] DownloadRequest request)
         {
             if (request == null || string.IsNullOrWhiteSpace(request.Path))
@@ -156,21 +159,26 @@ namespace FileManager.Controllers
          * Creates a new folder or file at the specified path. The path is relative to the root directory. If a file 
          * is included in the form-data, it will be saved at the specified path; otherwise, a new folder will be created.
          */
-        [HttpPost]
+        [HttpPost("upload")]
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> Create([FromQuery] string? path, IFormFile? file)
+        public async Task<IActionResult> Upload([FromForm] string? path, IFormFile? file)
         {
             // If a file is included in the payload, then consider this a file upload to the path directory
             if (file != null)
             {
                 return await UploadFile(path, file);
             }
-            // Otherwise, if only path is included, consider this a create folder request
-            else if (!string.IsNullOrWhiteSpace(path))
+            return BadRequest(new { error = "File is required for upload" });
+        }
+
+        [HttpPost("create")]
+        public async Task<IActionResult> Create([FromBody] PathRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Path))
             {
-                return await CreateFolder(path);
+                return BadRequest(new { error = "Path is required" });
             }
-            return BadRequest(new { error = "File or Path are required" });
+            return await CreateFolder(request.Path);
         }
 
         /**
@@ -279,9 +287,10 @@ namespace FileManager.Controllers
          *   - 404 Not Found: If the file or directory does not exist.
          *   - 500 Internal Server Error: If an error occurs during the deletion process.
          */
-        [HttpDelete]
-        public IActionResult Delete(string? path)
+        [HttpPost("delete")]
+        public IActionResult Delete([FromBody] PathRequest request)
         {
+            var path = request?.Path;
             // If the path provided is null, empty, or whitespace, return a 400 Bad Request response with an error message indicating that the path is required
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -346,9 +355,12 @@ namespace FileManager.Controllers
          *    - 404 Not Found: If the source file or directory does not exist.
          *    - 500 Internal Server Error: If an error occurs during the move operation.
          */
-        [HttpPut]
-        public IActionResult MoveFile(string sourcePath, string destinationPath)
+        [HttpPost("move")]
+        public IActionResult MoveFile([FromBody] MoveRequest request)
         {
+            var sourcePath = request?.SourcePath;
+            var destinationPath = request?.DestinationPath;
+
             // If the sourcePath is null, empty, or whitespace, return a 400 Bad Request response with an error message indicating that both paths are required
             if (string.IsNullOrWhiteSpace(sourcePath))
             {
@@ -450,8 +462,9 @@ namespace FileManager.Controllers
          *    - 500 Internal Server Error: If an error occurs during the duplication process.
          */
         [HttpPost("duplicate")]
-        public IActionResult Duplicate(string? path)
+        public IActionResult Duplicate([FromBody] PathRequest request)
         {
+            var path = request?.Path;
             // Validate a path was sent
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -549,6 +562,23 @@ namespace FileManager.Controllers
             }
         }
 
+    }
+
+    public class PathRequest
+    {
+        public string? Path { get; set; }
+    }
+
+    public class ListRequest
+    {
+        public string? Path { get; set; }
+        public string? Search { get; set; }
+    }
+
+    public class MoveRequest
+    {
+        public string? SourcePath { get; set; }
+        public string? DestinationPath { get; set; }
     }
 
     public class FolderItem
