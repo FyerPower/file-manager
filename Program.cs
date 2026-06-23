@@ -1,19 +1,30 @@
-namespace FileManager {
-    public class Program {
-        public static void Main(string[] args) {
+using System.IO;
+using FileManager.Helpers;
+
+namespace FileManager
+{
+    public class Program
+    {
+        public static void Main(string[] args)
+        {
             var builder = WebApplication.CreateBuilder(args);
-            
+
             builder.Configuration.AddEnvironmentVariables();
 
             // Add services to the container.
-
             builder.Services.AddControllers();
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
+            // Get the root directory from configuration
+            var rootDirectory = DirectoryHelper.NormalizePath(builder.Configuration.GetValue<string>("RootDirectory") ?? "C:/TestFiles");
 
-            if (builder.Configuration.GetValue<bool>("UseHttpsRedirection", true)) {
+            // Start file system watcher to keep directory statistics cache up to date
+            FileSystemWatcherService.CreateAndStart(rootDirectory, app.Lifetime);
+
+            // Configure the HTTP request pipeline.
+            if (builder.Configuration.GetValue<bool>("UseHttpsRedirection", true))
+            {
                 app.UseHttpsRedirection();
             }
 
@@ -26,5 +37,6 @@ namespace FileManager {
 
             app.Run();
         }
+
     }
 }

@@ -16,7 +16,7 @@ namespace FileManager.Controllers
             _logger = logger;
 
             // Get the root directory from configuration (appsettings.json)
-            _rootDirectory = Normalize(Path.GetFullPath(configuration.GetValue<string>("RootDirectory") ?? "C:/TestFiles"));
+            _rootDirectory = DirectoryHelper.NormalizePath(Path.GetFullPath(configuration.GetValue<string>("RootDirectory") ?? "C:/TestFiles"));
         }
 
         /**
@@ -44,7 +44,7 @@ namespace FileManager.Controllers
                 //   - If no path is provided, use the root directory
                 //   - If the path is provided, combine it with the root directory
                 string fullPath = string.IsNullOrWhiteSpace(path) ? _rootDirectory : Path.Combine(_rootDirectory, path);
-                fullPath = Normalize(fullPath);
+                fullPath = DirectoryHelper.NormalizePath(fullPath);
 
                 // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
                 if (!IsWithinRootDirectory(fullPath, true))
@@ -119,7 +119,7 @@ namespace FileManager.Controllers
             {
                 // Combine the provided path with the root directory to get the full path of the target file
                 string fullPath = Path.Combine(_rootDirectory, request.Path);
-                fullPath = Normalize(fullPath);
+                fullPath = DirectoryHelper.NormalizePath(fullPath);
 
                 // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
                 if (!IsWithinRootDirectory(fullPath))
@@ -194,7 +194,7 @@ namespace FileManager.Controllers
         {
             // Determine the fullpath based on the provided path parameter
             string fullPath = string.IsNullOrWhiteSpace(path) ? _rootDirectory : Path.Combine(_rootDirectory, path);
-            fullPath = Normalize(fullPath);
+            fullPath = DirectoryHelper.NormalizePath(fullPath);
 
             // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
             if (!IsWithinRootDirectory(fullPath))
@@ -249,7 +249,7 @@ namespace FileManager.Controllers
         private async Task<IActionResult> CreateFolder(string path)
         {
             string fullPath = Path.Combine(_rootDirectory, path);
-            fullPath = Normalize(fullPath);
+            fullPath = DirectoryHelper.NormalizePath(fullPath);
 
             // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
             if (!IsWithinRootDirectory(fullPath))
@@ -297,7 +297,7 @@ namespace FileManager.Controllers
             {
                 // Get the full target path
                 string fullPath = Path.Combine(_rootDirectory, path);
-                fullPath = Normalize(fullPath);
+                fullPath = DirectoryHelper.NormalizePath(fullPath);
 
                 // Validate the file or directory is within the root directory ( prevents ../ attacks )
                 if (!IsWithinRootDirectory(fullPath))
@@ -365,9 +365,9 @@ namespace FileManager.Controllers
             try
             {
                 string sourceFullPath = Path.Combine(_rootDirectory, sourcePath);
-                sourceFullPath = Normalize(sourceFullPath);
+                sourceFullPath = DirectoryHelper.NormalizePath(sourceFullPath);
                 string destinationFullPath = Path.Combine(_rootDirectory, destinationPath ?? "");
-                destinationFullPath = Normalize(destinationFullPath);
+                destinationFullPath = DirectoryHelper.NormalizePath(destinationFullPath);
 
                 // Validate both source and destination paths are within the root directory ( prevents ../ attacks )
                 if (!IsWithinRootDirectory(sourceFullPath) || !IsWithinRootDirectory(destinationFullPath))
@@ -470,7 +470,7 @@ namespace FileManager.Controllers
             try
             {
                 string sourceFullPath = Path.Combine(_rootDirectory, path);
-                sourceFullPath = Normalize(sourceFullPath);
+                sourceFullPath = DirectoryHelper.NormalizePath(sourceFullPath);
 
                 // Security Guard: Validate the path is within the root directory
                 if (!IsWithinRootDirectory(sourceFullPath))
@@ -579,21 +579,6 @@ namespace FileManager.Controllers
             return fullPath.StartsWith(fullRootPath, StringComparison.OrdinalIgnoreCase) && (allowRootAccess || fullPath.Length > fullRootPath.Length);
         }
 
-        /**
-         *  Normalize a path by:
-         *    1. trim trailing / or \
-        *     2. replace the wrong \ with right / depending on the particular OS.
-         */
-        private static string Normalize(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                return string.Empty;
-
-            return path
-                .Trim()
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-        }
     }
 
     public class FolderItem
