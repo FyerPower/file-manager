@@ -7,7 +7,6 @@ namespace FileManager.Controllers
     [Route("[controller]")]
     public class ApiController : ControllerBase
     {
-
         private readonly ILogger<ApiController> _logger;
         private readonly DirectoryHelper _directoryHelper;
         private readonly DirectoryStatisticsCache _directoryStatisticsCache;
@@ -20,10 +19,11 @@ namespace FileManager.Controllers
         }
 
         /**
-         * GET: 
-         *   /api
-         *   /api?path=subfolder
-         * Retrieves the list of files and directories at the specified path. The path is relative to the root directory.
+         * POST: /api
+         * Request Body:
+         *   { Path: string, Search: string }
+         * Description:
+         *   Retrieves the list of files and directories at the specified path. The path is relative to the root directory.
          * Validations:
          *   - The path must be within the root directory (prevents ../ attacks).
          * Behavior:
@@ -67,9 +67,11 @@ namespace FileManager.Controllers
                 // Get Directory Information
                 var directory = new DirectoryInfo(fullPath);
 
+                // *** Potential Performance Improvement: Instead of using "*" it might be more performance to use null.   Using null might cut around the filtering logic where having a search value / wildcard would require search matching.
                 string query = string.IsNullOrWhiteSpace(search) ? "*" : $"*{search}*";
 
                 // Get all directories
+                // *** Potential Performance Improvement:  Use EnumerateDirectories instead of GetDirectories.   (Enumerate will stream directories instead of potentially getting back a very large DirectoryInfo[] filling memory unnecessarily)
                 foreach (var dir in directory.GetDirectories(query))
                 {
                     var stats = _directoryStatisticsCache.GetStatistics(dir.FullName);
@@ -97,7 +99,10 @@ namespace FileManager.Controllers
 
         /**
          * POST: /api/download
-         * Downloads a file from the server. The request body must include a JSON payload with a `path` property.
+         * Request Body:
+         *   { Path: string }
+         * Description: 
+         *   Downloads a file from the server. The request body must include a JSON payload with a `path` property.
          * Validations:
          *   - The path parameter is required and cannot be null, empty, or whitespace.
          *   - The path must be within the root directory (prevents ../ attacks).
@@ -150,27 +155,23 @@ namespace FileManager.Controllers
             }
         }
 
-
-
         /**
-         * Create a new file / folder: 
-         *   Create Folder: POST /api?path=subfolder/newfolder
-         *   Upload File:   POST /api?path=subfolder/newfile.txt (with file in form-data)
-         * Creates a new folder or file at the specified path. The path is relative to the root directory. If a file 
-         * is included in the form-data, it will be saved at the specified path; otherwise, a new folder will be created.
+         * POST: /api/create
+         * Request Form Data:
+         *   { Path: string }
+         * Description: 
+         *   Creates a new Folder into the file system
+         * Validations:
+         *   - The path must be within the root directory (prevents ../ attacks).
+         * Behavior:
+         *   - If the folder already exists, it will return a conflict response.
+         *   - If the folder does not exist, it will be created at the specified path.
+         * Responses:
+         *   - 200 OK: If the folder was created successfully.
+         *   - 400 Bad Request: If the validation fails (e.g., invalid path).
+         *   - 409 Conflict: If a file or folder already exists at the specified path.
+         *   - 500 Internal Server Error: If an error occurs during the folder creation process.
          */
-        [HttpPost("upload")]
-        [Consumes("multipart/form-data")]
-        public async Task<IActionResult> Upload([FromForm] string? path, IFormFile? file)
-        {
-            // If a file is included in the payload, then consider this a file upload to the path directory
-            if (file != null)
-            {
-                return await UploadFile(path, file);
-            }
-            return BadRequest(new { error = "File is required for upload" });
-        }
-
         [HttpPost("create")]
         public async Task<IActionResult> Create([FromBody] PathRequest request)
         {
@@ -178,28 +179,53 @@ namespace FileManager.Controllers
             {
                 return BadRequest(new { error = "Path is required" });
             }
-            return await CreateFolder(request.Path);
+
+            string fullPath = Path.Combine(_directoryHelper.RootDirectory, request.Path);
+            fullPath = _directoryHelper.NormalizePath(fullPath);
+
+            // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
+            if (!_directoryHelper.IsWithinRootDirectory(fullPath))
+            {
+                return BadRequest(new { error = "Invalid path - access denied" });
+            }
+
+            // Fail if the same path already exists as a folder
+            if (Directory.Exists(fullPath))
+            {
+                return Conflict(new { error = "A folder already exists at the specified path" });
+            }
+
+            Directory.CreateDirectory(fullPath);
+            return Ok(new { message = "Folder created successfully" });
         }
 
         /**
-          * Handles the uploading of a file to the server. It takes an optional path parameter to determine where to 
-          * save the file within the root directory. If no path is provided, it saves the file directly in the root 
-          * directory. The method includes security checks to prevent directory traversal attacks and ensures that the 
-          * necessary directories are created if they do not exist.
-          * 
-          * Validations:
-          *   - The path must be within the root directory (prevents ../ attacks).
-          * Behavior:
-          *   - If the path points to a non-existent directory, the necessary directories will be created automatically.
-          *   The uploaded file will be saved at the specified path with its original file name.
-          * Responses:
-          *   - 200 OK: If the file was uploaded successfully.
-          *   - 400 Bad Request: If the validation fails (e.g., invalid path).
-          *   - 409 Conflict: If a file or folder already exists at the target path.
-          *   - 500 Internal Server Error: If an error occurs during the file upload process.
-          */
-        private async Task<IActionResult> UploadFile(string? path, IFormFile file)
+         * POST: /api/upload
+         * Request Data:
+         *   { path: string, file: File }
+         * Description: 
+         *   Uploads a new file into the file system
+         * Validations:
+         *   - The path must be within the root directory (prevents ../ attacks).
+         * Behavior:
+         *   - If the path points to a non-existent directory, the necessary directories will be created automatically.
+         *   The uploaded file will be saved at the specified path with its original file name.
+         * Responses:
+         *   - 200 OK: If the file was uploaded successfully.
+         *   - 400 Bad Request: If the validation fails (e.g., invalid path).
+         *   - 409 Conflict: If a file or folder already exists at the target path.
+         *   - 500 Internal Server Error: If an error occurs during the file upload process.
+         */
+        [HttpPost("upload")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> Upload([FromForm] string? path, IFormFile? file)
         {
+            // If a file is included in the payload, then consider this a file upload to the path directory
+            if (file == null)
+            {
+                return BadRequest(new { error = "File is required for upload" });
+            }
+
             // Determine the fullpath based on the provided path parameter
             string fullPath = string.IsNullOrWhiteSpace(path) ? _directoryHelper.RootDirectory : Path.Combine(_directoryHelper.RootDirectory, path);
             fullPath = _directoryHelper.NormalizePath(fullPath);
@@ -237,44 +263,11 @@ namespace FileManager.Controllers
         }
 
         /**
-         * Handles the creation of a new folder at the specified path. It includes security checks to prevent directory 
-         * traversal attacks and ensures that the folder is created successfully if it does not already exist.
-         * 
-         * Validations:
-         *   - The path must be within the root directory (prevents ../ attacks).
-         * Behavior:
-         *   - If the folder already exists, it will return a conflict response.
-         *   - If the folder does not exist, it will be created at the specified path.
-         * Responses:
-         *   - 200 OK: If the folder was created successfully.
-         *   - 400 Bad Request: If the validation fails (e.g., invalid path).
-         *   - 409 Conflict: If a file or folder already exists at the specified path.
-         *   - 500 Internal Server Error: If an error occurs during the folder creation process.
-         */
-        private async Task<IActionResult> CreateFolder(string path)
-        {
-            string fullPath = Path.Combine(_directoryHelper.RootDirectory, path);
-            fullPath = _directoryHelper.NormalizePath(fullPath);
-
-            // Security Guard: Validate the path is within the root directory ( prevents ../ attacks )
-            if (!_directoryHelper.IsWithinRootDirectory(fullPath))
-            {
-                return BadRequest(new { error = "Invalid path - access denied" });
-            }
-
-            // Fail if the same path already exists as a folder
-            if (Directory.Exists(fullPath))
-            {
-                return Conflict(new { error = "A folder already exists at the specified path" });
-            }
-
-            Directory.CreateDirectory(fullPath);
-            return Ok(new { message = "Folder created successfully" });
-        }
-
-        /**
-         * DELETE: /api?path=subfolder/file.txt
-         * Deletes a file or directory at the specified path. The path is relative to the root directory.
+         * POST: /api/delete
+         * Request Data:
+         *   { path: string }
+         * Description: 
+         *   Deletes a file or directory at the specified path. The path is relative to the root directory.
          * Validations:
          *   - The path parameter is required and cannot be null, empty, or whitespace.
          *   - The path must be within the root directory (prevents ../ attacks).
@@ -337,10 +330,11 @@ namespace FileManager.Controllers
         }
 
         /**
-         * PUT: 
-         *    /api?sourcePath=subfolder/file.txt&destinationPath=otherfolder/
-         *    /api?sourcePath=subfolder/file.txt&destinationPath=otherfolder/newfile.txt
-         * Moves a file or directory from sourcePath to destinationPath. Both paths are relative to the root directory.
+         * POST: /api/move
+         * Request Data:
+         *   { sourcePath: string, destinationPath: string }
+         * Description: 
+         *   Moves a file or directory from sourcePath to destinationPath. Both paths are relative to the root directory.
          * Validations:
          *    - Both sourcePath and destinationPath are required and cannot be null, empty, or whitespace.
          *    - Both paths must be within the root directory (prevents ../ attacks).
@@ -447,8 +441,11 @@ namespace FileManager.Controllers
         }
 
         /**
-         * POST: /api/duplicate?path=subfolder/file.txt
-         * Duplicates a file or directory at the specified path. The path is relative to the root directory.
+         * POST: /api/duplicate
+         * Request Data:
+         *   { Path: string }
+         * Description: 
+         *   Duplicates a file or directory at the specified path. The path is relative to the root directory.
          * Validations:
          *    - The path parameter is required and cannot be null, empty, or whitespace.
          *    - The path must be within the root directory (prevents ../ attacks).
@@ -589,6 +586,7 @@ namespace FileManager.Controllers
         public required long? FileCount { get; set; }
     }
 
+    // REFACTOR: Get rid of this class and use PathRequest instead.
     public class DownloadRequest
     {
         public string? Path { get; set; }
