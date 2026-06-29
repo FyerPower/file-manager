@@ -14,19 +14,9 @@ namespace FileManager.Helpers
             _directoryHelper = directoryHelper;
         }
 
-        public (long? TotalSize, long? FileCount) GetStatistics(string dirFullPath)
-        {
-            try
-            {
-                return GetStatistics(new DirectoryInfo(dirFullPath));
-            }
-            catch
-            {
-                return (null, null);
-            }
-        }
-
-        // Public getter. Returns (TotalSize, FileCount) or (null,null) on failure.
+        /**
+         *  Public getter. Returns (TotalSize, FileCount) or (null,null) on failure.
+         */
         public (long? TotalSize, long? FileCount) GetStatistics(DirectoryInfo dir)
         {
             try
@@ -87,7 +77,24 @@ namespace FileManager.Helpers
             }
         }
 
-        // Remove cache entries for a directory subtree
+        /**
+         *  Helper method accepting alternate paramaters for GetStatistics
+         */
+        public (long? TotalSize, long? FileCount) GetStatistics(string dirFullPath)
+        {
+            try
+            {
+                return GetStatistics(new DirectoryInfo(dirFullPath));
+            }
+            catch
+            {
+                return (null, null);
+            }
+        }
+
+        /**
+         *  Remove cache entries for a directory subtree
+         */
         public void RemoveDirectoryFromCache(string dirFullPath)
         {
             // Get a list of all cached entries that existed in the source folder.   We will need to update those records
@@ -111,7 +118,7 @@ namespace FileManager.Helpers
          */
         public void HandleFileDeleted(string oldFullPath, long size)
         {
-            WalkParentCacheAndModify(oldFullPath, -1 * size, -1);
+            WalkParentCacheAndModify(oldFullPath, -size, -1);
         }
 
         /**
@@ -119,7 +126,7 @@ namespace FileManager.Helpers
          */
         public void HandleFileMoved(string oldFullPath, string newFullPath, long size)
         {
-            WalkParentCacheAndModify(oldFullPath, -1 * size, -1);
+            WalkParentCacheAndModify(oldFullPath, -size, -1);
             WalkParentCacheAndModify(newFullPath, size, 1);
         }
 
@@ -132,8 +139,9 @@ namespace FileManager.Helpers
         }
 
 
-
-        // Handle directory moved: transfer cached subtree entries if present, otherwise fallback to recalculation
+        /**
+         *  Handle directory moved: transfer cached subtree entries if present, otherwise fallback to recalculation
+         */
         public void HandleDirectoryMoved(string oldFullPath, string newFullPath)
         {
             try
@@ -158,7 +166,7 @@ namespace FileManager.Helpers
                     var rootEntryStats = rootEntry.Value;
 
                     // Subtract from old parents
-                    WalkParentCacheAndModify(newFullPath, -1 * rootEntryStats.TotalSize, -1 * rootEntryStats.FileCount);
+                    WalkParentCacheAndModify(newFullPath, -rootEntryStats.TotalSize, -rootEntryStats.FileCount);
 
                     // Add to new parents
                     WalkParentCacheAndModify(newFullPath, rootEntryStats.TotalSize, rootEntryStats.FileCount);
@@ -180,7 +188,9 @@ namespace FileManager.Helpers
             catch { }
         }
 
-        // Handle directory deletion: remove subtree and update ancestors using cached totals when available
+        /**
+         *  Handle directory deletion: remove subtree and update ancestors using cached totals when available
+         */
         public void HandleDirectoryDeleted(string dirFullPath)
         {
             try
@@ -190,12 +200,16 @@ namespace FileManager.Helpers
                     // Remove subtree entries
                     RemoveDirectoryFromCache(dirFullPath);
                     // Subtract totals from cached ancestors only
-                    WalkParentCacheAndModify(dirFullPath, -1 * removed.TotalSize, -1 * removed.FileCount);
+                    WalkParentCacheAndModify(dirFullPath, -removed.TotalSize, -removed.FileCount);
                 }
             }
             catch { }
         }
 
+        /**
+         *  Force refresh a directory.   When an outside actor deletes a file or folder from within a directory lets delete the cache and get new statistics.   Then instead of refreshing 
+         *    the statistics in the entire directory tree up to the root, lets programmatically update it using the diff of what changed in the current statistics.
+         */
         public void ForceRefreshDirectory(string dirFullPath)
         {
             // Remove the current cache values, if so, we can programmatically shortcut the parent size modifications
@@ -224,6 +238,9 @@ namespace FileManager.Helpers
             }
         }
 
+        /**
+         *  Walk up the directory tree until we cannot go any higher or we're no longer in the root directory.  At each step, we will update the cache by size & count (Parameters sent)
+         */
         private void WalkParentCacheAndModify(string fileFullPath, long size, long count)
         {
             try
